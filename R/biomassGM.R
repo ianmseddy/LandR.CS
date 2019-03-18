@@ -13,7 +13,7 @@
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, CMD, ATA, gmcsModel, pixelGroupMap){
-
+  browser()
   CMDvals <- getValues(CMD)
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
