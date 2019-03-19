@@ -4,7 +4,8 @@
 \alias{calculateClimateEffect}
 \title{CalculateClimateEffect}
 \usage{
-calculateClimateEffect(cohortData, CMD, ATA, gmcsModel, pixelGroupMap)
+calculateClimateEffect(cohortData, CMD, ATA, gcsModel, mcsModel,
+  pixelGroupMap)
 }
 \arguments{
 \item{cohortData}{The LandR cohortData object}
@@ -13,7 +14,9 @@ calculateClimateEffect(cohortData, CMD, ATA, gmcsModel, pixelGroupMap)
 
 \item{ATA}{A raster with annual temperature anomaly values}
 
-\item{gmcsModel}{a model object created by gmcsDataPrep}
+\item{gcsModel}{climate-sensitive growth mixed effect model object created by gmcsDataPrep}
+
+\item{mcsModel}{climate-sensitive mortality mixed effect model object created by gmcsDataPrep}
 
 \item{pixelGroupMap}{the pixelGroupMap needed to match cohorts with raster values}
 }
