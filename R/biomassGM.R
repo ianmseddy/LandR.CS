@@ -14,8 +14,9 @@
 #' @importFrom raster getValues
 #' @rdname calculateClimateEffect
 #' @export
-calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pixelGroupMap, centeringVec){
-  browser()
+calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel,
+                                   pixelGroupMap, centeringVec){
+
   CMDvals <- getValues(CMD)
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
@@ -51,7 +52,7 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pix
                               "growthPred" = growthPred,
                               "mortPred" = mortPred)
   #good work Ian
-   return(climateMatch)
+   return(climateEffect)
 }
 
 #'  Calculate climate growth
@@ -61,12 +62,18 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pix
 #'
 #' @export
 calculateClimateMortality <- function(subCohortData, predObj){
-  browser()
 
-
-  #Need to generate predicted changes in biomass, return that object.
-  #Other 2 functions will return proportional changes in mortality and growth
-
+  subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B)]
+  subCohorts[, "sumB" := sum(B), by = "pixelGroup"]
+  subCohorts[, "propB" := B/sumB,]
+  #subCohortData should be sorted on pixelGroup. Need to preserve original order
+  subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
+  setkey(subCohorts, "pixelGroup")
+  setkey(predObj, "pixelGroup")
+  predObj[subCohorts]
+  subCohorts[, "climMortality" := mortPred * propB]
+  setkey(subCohorts, "rowOrder") #Back to original order
+  return(subCohorts$climMortality)
 }
 
 #'  CalculateClimateGrowth
@@ -75,12 +82,17 @@ calculateClimateMortality <- function(subCohortData, predObj){
 #' @export
 #' @rdname calculateClimateGrowth
 calculateClimateGrowth <- function(subCohortData, predObj){
-  browser()
 
-  #what needs to be returned is a vector
-  #Join cohort data? Take max age, convert to log, take mean.
-
-  #Need to generate predicted changes in biomass, return that object.
-  #Other 2 functions will return proportional changes in mortality and growth
+  subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B)]
+  subCohorts[, "sumB" := sum(B), by = "pixelGroup"]
+  subCohorts[, "propB" := B/sumB,]
+  #subCohortData should be sorted on pixelGroup. Need to preserve original order
+  subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
+  setkey(subCohorts, "pixelGroup")
+  setkey(predObj, "pixelGroup")
+  predObj[subCohorts]
+  subCohorts[, "climGrowth" := growthPred * propB]
+  setkey(subCohorts, "rowOrder") #Back to original order
+  return(subCohorts$climGrowth)
 
 }
