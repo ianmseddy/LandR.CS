@@ -79,9 +79,10 @@ calculateClimateMortality <- function(subCohortData, predObj){
 #'  CalculateClimateGrowth
 #' @param subCohortData The LandR cohortData object
 #' @param predObj climate prediction object
+#' @param type predict growth or mortality
 #' @export
 #' @rdname calculateClimateGrowth
-calculateClimateGrowth <- function(subCohortData, predObj){
+calculateClimateGrowth <- function(subCohortData, predObj, type){
 
   subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B)]
   subCohorts[, "sumB" := sum(B), by = "pixelGroup"]
@@ -91,8 +92,10 @@ calculateClimateGrowth <- function(subCohortData, predObj){
   setkey(subCohorts, "pixelGroup")
   setkey(predObj, "pixelGroup")
   subCohorts <- predObj[subCohorts]
-  subCohorts[, "climGrowth" := growthPred * propB]
+  browser()
+
+  subCohorts[, "climStat" := eval(type) * propB]
   setkey(subCohorts, "rowOrder") #Back to original order
-  return(subCohorts$climGrowth)
+  return(subCohorts$climStat)
 
 }
