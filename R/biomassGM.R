@@ -55,34 +55,18 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel,
    return(climateEffect)
 }
 
-#'  Calculate climate growth
-#' @param subCohortData The LandR cohortData object
-#' @param predObj climate prediction object
-#' @rdname calculateClimateMortality
+
+#'  assignClimateEffect
 #'
-#' @export
-calculateClimateMortality <- function(subCohortData, predObj){
-
-  subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B)]
-  subCohorts[, "sumB" := sum(B), by = "pixelGroup"]
-  subCohorts[, "propB" := B/sumB,]
-  #subCohortData should be sorted on pixelGroup. Need to preserve original order
-  subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
-  setkey(subCohorts, "pixelGroup")
-  setkey(predObj, "pixelGroup")
-  subCohorts <- predObj[subCohorts]
-  subCohorts[, "climMortality" := mortPred * propB]
-  setkey(subCohorts, "rowOrder") #Back to original order
-  return(subCohorts$climMortality)
-}
-
-#'  CalculateClimateGrowth
+#'  Calculates climate-dependent mortality and growth proportional to
+#'  each cohorts biomass in the pixelGroup
+#'
 #' @param subCohortData The LandR cohortData object
 #' @param predObj climate prediction object
 #' @param type predict growth or mortality
 #' @export
-#' @rdname calculateClimateGrowth
-calculateClimateGrowth <- function(subCohortData, predObj, type){
+#' @rdname assignClimateEffect
+assignClimateEffect <- function(subCohortData, predObj, type){
 
   subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B)]
   subCohorts[, "sumB" := sum(B), by = "pixelGroup"]
@@ -92,9 +76,7 @@ calculateClimateGrowth <- function(subCohortData, predObj, type){
   setkey(subCohorts, "pixelGroup")
   setkey(predObj, "pixelGroup")
   subCohorts <- predObj[subCohorts]
-  browser()
-
-  subCohorts[, "climStat" := eval(type) * propB]
+  subCohorts[, "climStat" := eval(parse(text = type)) * propB]
   setkey(subCohorts, "rowOrder") #Back to original order
   return(subCohorts$climStat)
 
