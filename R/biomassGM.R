@@ -55,7 +55,7 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pix
 }
 
 #'  Calculate climate growth
-#' @param cohortData The LandR cohortData object
+#' @param subCohortData The LandR cohortData object
 #' @param predObj climate prediction object
 #' @rdname calculateClimateMortality
 #'
@@ -76,7 +76,8 @@ calculateClimateMortality <- function(subCohortData, predObj){
 #' @rdname calculateClimateGrowth
 calculateClimateGrowth <- function(subCohortData, predObj){
   browser()
-  cohortData #what needs to be returned is a vector
+
+  #what needs to be returned is a vector
   #Join cohort data? Take max age, convert to log, take mean.
 
   #Need to generate predicted changes in biomass, return that object.

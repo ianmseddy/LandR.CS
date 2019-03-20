@@ -4,10 +4,10 @@
 \alias{calculateClimateGrowth}
 \title{CalculateClimateGrowth}
 \usage{
-calculateClimateGrowth(cohortData, predObj)
+calculateClimateGrowth(subCohortData, predObj)
 }
 \arguments{
-\item{cohortData}{The LandR cohortData object}
+\item{subCohortData}{The LandR cohortData object}
 
 \item{predObj}{climate prediction object}
 }
