@@ -70,7 +70,7 @@ calculateClimateMortality <- function(subCohortData, predObj){
   subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
   setkey(subCohorts, "pixelGroup")
   setkey(predObj, "pixelGroup")
-  predObj[subCohorts]
+  subCohorts <- predObj[subCohorts]
   subCohorts[, "climMortality" := mortPred * propB]
   setkey(subCohorts, "rowOrder") #Back to original order
   return(subCohorts$climMortality)
@@ -90,7 +90,7 @@ calculateClimateGrowth <- function(subCohortData, predObj){
   subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
   setkey(subCohorts, "pixelGroup")
   setkey(predObj, "pixelGroup")
-  predObj[subCohorts]
+  subCohorts <- predObj[subCohorts]
   subCohorts[, "climGrowth" := growthPred * propB]
   setkey(subCohorts, "rowOrder") #Back to original order
   return(subCohorts$climGrowth)
