@@ -21,8 +21,8 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pix
   pixels <- getValues(pixelGroupMap)
   #Center observations on mean of original model data
   climateMatch <- data.table("pixelGroup" = pixels,
-                             "mCMD" = CMDvals - centeringVect["CMD"],
-                             "mATA" = ATAvals - centeringVect["ATA"])
+                             "mCMD" = CMDvals - centeringVec["CMD"],
+                             "mATA" = ATAvals - centeringVec["ATA"])
 
   climateMatch <- climateMatch[!is.na(pixelGroup)]
   #Take the median climate variables for each pixel group
@@ -30,7 +30,7 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pix
 
   #summarize cohortData by biomass
   cohortData <- cohortData[, list(age = max(age), B = sum(B)), by = "pixelGroup"]
-  cohortData$mLogAge <- log(cohortData$age) - centeringVect["logAge"]
+  cohortData$mLogAge <- log(cohortData$age) - centeringVec["logAge"]
   setkey(cohortData, pixelGroup)
   setkey(out, pixelGroup)
   #Join cohort Data with climate data
