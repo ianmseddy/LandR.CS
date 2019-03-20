@@ -40,7 +40,7 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pix
   growthPred <- predict(gcsModel, predData, na.rm = TRUE, level = 0, asList = TRUE)
   #Prediction is in tons/ha, must be rescaled to g/m2
   #1000000 g/10000 m2 = 100 * g/m2
-  growthPred <- newPred * 100
+  growthPred <- growthPred * 100
 
   mortPred <- predict(mcsModel, predData, na.rm = TRUE, levle = 0, asList = TRUE)
   mortPred <- mortPred * 100
