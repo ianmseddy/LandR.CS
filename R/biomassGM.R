@@ -8,41 +8,48 @@
 #' @param gcsModel climate-sensitive growth mixed effect model object created by gmcsDataPrep
 #' @param mcsModel climate-sensitive mortality mixed effect model object created by gmcsDataPrep
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
+#' @param centeringVec the means of the data used to create gcsModel and mcsModel
 #' @importFrom data.table setkey data.table
 #' @importFrom stats median
 #' @importFrom raster getValues
 #' @rdname calculateClimateEffect
 #' @export
-calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pixelGroupMap){
+calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pixelGroupMap, centeringVec){
   browser()
   CMDvals <- getValues(CMD)
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
-  #Center observations on mean
+  #Center observations on mean of original model data
   climateMatch <- data.table("pixelGroup" = pixels,
-                             "mCMD" = CMDvals - mean(CMDvals, na.rm = TRUE),
-                             "mATA" = ATAvals - mean(ATAvals, na.rm = TRUE))
+                             "mCMD" = CMDvals - centeringVect["CMD"],
+                             "mATA" = ATAvals - centeringVect["ATA"])
 
   climateMatch <- climateMatch[!is.na(pixelGroup)]
+  #Take the median climate variables for each pixel group
   out <- climateMatch[, list("mCMD" = median(mCMD, na.rm = TRUE), "mATA" = median(mATA, na.rm = TRUE)), by = "pixelGroup"]
 
   #summarize cohortData by biomass
   cohortData <- cohortData[, list(age = max(age), B = sum(B)), by = "pixelGroup"]
-  cohortData$mLogAge <- log(cohortData$age) - mean(log(cohortData$age))
+  cohortData$mLogAge <- log(cohortData$age) - centeringVect["logAge"]
   setkey(cohortData, pixelGroup)
   setkey(out, pixelGroup)
+  #Join cohort Data with climate data
   predData <- out[cohortData]
-  #THE PREDICTION IS IN TONS PER HECTARE NEVER FORGET
-  newPred <- predict(gmcsModel, predData,
-                        na.rm = TRUE, level = 0, asList = TRUE)
 
-  #Hurray now we have the prediction whoo hoooo. But is it still in units of t/ha, so multiply by 100.
+  #make prediction
+  growthPred <- predict(gcsModel, predData, na.rm = TRUE, level = 0, asList = TRUE)
+  #Prediction is in tons/ha, must be rescaled to g/m2
+  #1000000 g/10000 m2 = 100 * g/m2
+  growthPred <- newPred * 100
 
+  mortPred <- predict(mcsModel, predData, na.rm = TRUE, levle = 0, asList = TRUE)
+  mortPred <- mortPred * 100
+
+  climateEffect <- data.table("pixelGroup" = predData$pixelGroup,
+                              "growthPred" = growthPred,
+                              "mortPred" = mortPred)
+  #good work Ian
    return(climateMatch)
-
-  #Need to generate predicted changes in biomass, return that object.
-  #Other 2 functions will return proportional changes in mortality and growth
-
 }
 
 #'  Calculate climate growth
@@ -52,7 +59,7 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel, pix
 #'
 #' @export
 calculateClimateMortality <- function(cohortData, predObj){
-  print(predObj)
+  browser()
   cohortData #what needs to be returned is a vector
   #Join cohort data? Take max age, convert to log, take mean.
 
@@ -67,6 +74,7 @@ calculateClimateMortality <- function(cohortData, predObj){
 #' @export
 #' @rdname calculateClimateGrowth
 calculateClimateGrowth <- function(cohortData, predObj){
+  browser()
   cohortData #what needs to be returned is a vector
   #Join cohort data? Take max age, convert to log, take mean.
 

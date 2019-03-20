@@ -5,7 +5,7 @@
 \title{CalculateClimateEffect}
 \usage{
 calculateClimateEffect(cohortData, CMD, ATA, gcsModel, mcsModel,
-  pixelGroupMap)
+  pixelGroupMap, centeringVec)
 }
 \arguments{
 \item{cohortData}{The LandR cohortData object}
@@ -19,6 +19,8 @@ calculateClimateEffect(cohortData, CMD, ATA, gcsModel, mcsModel,
 \item{mcsModel}{climate-sensitive mortality mixed effect model object created by gmcsDataPrep}
 
 \item{pixelGroupMap}{the pixelGroupMap needed to match cohorts with raster values}
+
+\item{centeringVec}{the means of the data used to create gcsModel and mcsModel}
 }
 \description{
 Predict biomass change with climate variables
