@@ -68,15 +68,29 @@ calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel,
 #' @rdname assignClimateEffect
 assignClimateEffect <- function(subCohortData, predObj, type){
 
-  subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B)]
-  subCohorts[, "sumB" := sum(B), by = "pixelGroup"]
-  subCohorts[, "propB" := B/sumB,]
-  #subCohortData should be sorted on pixelGroup. Need to preserve original order
-  subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
-  setkey(subCohorts, "pixelGroup")
-  setkey(predObj, "pixelGroup")
-  subCohorts <- predObj[subCohorts]
-  subCohorts[, "climStat" := eval(parse(text = type)) * propB]
+  subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B, 'aNPPAct' = aNPPAct)]
+
+  #Mortality is proportional to each cohort's biomass
+  if (type == 'mortPred') {
+    subCohorts[, "sumB" := sum(B), by = "pixelGroup"]
+    subCohorts[, "propB" := B/sumB,]
+    #subCohortData should be sorted on pixelGroup. Need to preserve original order
+    subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
+    setkey(subCohorts, "pixelGroup")
+    setkey(predObj, "pixelGroup")
+    subCohorts <- predObj[subCohorts]
+    subCohorts[, "climStat" := eval(parse(text = type)) * propB]
+  } else {
+    #Growth is proportionalt o each cohort's annual net primary productivity
+    subCohorts[, "sumANPP" := sum(aNPPAct), by = "pixelGroup"]
+    subCohorts[, "propANPP" := aNPPAct/sumANPP,]
+    #subCohortData should be sorted on pixelGroup. Need to preserve original order
+    subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
+    setkey(subCohorts, "pixelGroup")
+    setkey(predObj, "pixelGroup")
+    subCohorts <- predObj[subCohorts]
+    subCohorts[, "climStat" := eval(parse(text = type)) * propANPP]
+  }
   setkey(subCohorts, "rowOrder") #Back to original order
   return(subCohorts$climStat)
 
