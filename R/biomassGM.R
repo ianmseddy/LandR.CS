@@ -96,9 +96,6 @@ assignClimateEffect <- function(subCohortData, predObj, type){
     subCohorts <- predObj[subCohorts]
     subCohorts[, "climStat" := eval(parse(text = type)) * propANPP]
   }
-  if (anyNA(subCohorts$climStat)) {
-    browser()
-  }
   setkey(subCohorts, "rowOrder") #Back to original order
   return(subCohorts$climStat)
 
