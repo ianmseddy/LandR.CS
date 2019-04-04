@@ -16,7 +16,9 @@
 #' @export
 calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel,
                                    pixelGroupMap, centeringVec){
-
+  if (is.null(CMD)) {
+    stop("Missing climate data needed to run LandR.CS - consider running module gmcsDataPrep and PSP_Clean")
+  }
   CMDvals <- getValues(CMD)
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
