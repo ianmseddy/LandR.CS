@@ -4,13 +4,13 @@
 \alias{calculateClimateEffect}
 \title{CalculateClimateEffect}
 \usage{
-calculateClimateEffect(cohortData, CMD, ATA, gcsModel, mcsModel,
+calculateClimateEffect(cohortData, CMI, ATA, gcsModel, mcsModel,
   pixelGroupMap, centeringVec)
 }
 \arguments{
 \item{cohortData}{The LandR cohortData object}
 
-\item{CMD}{A raster with annual Cumulative Moisture Deficit values}
+\item{CMI}{A raster with annual Cumulative Moisture Index values}
 
 \item{ATA}{A raster with annual temperature anomaly values}
 

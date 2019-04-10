@@ -3,7 +3,7 @@
 #'  Predict biomass change with climate variables
 #'
 #' @param cohortData The LandR cohortData object
-#' @param CMD A raster with annual Cumulative Moisture Deficit values
+#' @param CMI A raster with annual Cumulative Moisture Index values
 #' @param ATA A raster with annual temperature anomaly values
 #' @param gcsModel climate-sensitive growth mixed effect model object created by gmcsDataPrep
 #' @param mcsModel climate-sensitive mortality mixed effect model object created by gmcsDataPrep
@@ -14,22 +14,22 @@
 #' @importFrom raster getValues
 #' @rdname calculateClimateEffect
 #' @export
-calculateClimateEffect <- function(cohortData, CMD, ATA, gcsModel, mcsModel,
+calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
                                    pixelGroupMap, centeringVec){
-  if (is.null(CMD)) {
+  if (is.null(CMI)) {
     stop("Missing climate data needed to run LandR.CS - consider running module gmcsDataPrep and PSP_Clean")
   }
-  CMDvals <- getValues(CMD)
+  CMIvals <- getValues(CMI)
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
   #Center observations on mean of original model data
   climateMatch <- data.table("pixelGroup" = pixels,
-                             "mCMD" = CMDvals - centeringVec["CMD"],
+                             "mCMI" = CMIvals - centeringVec["CMI"],
                              "mATA" = ATAvals - centeringVec["ATA"])
 
   climateMatch <- climateMatch[!is.na(pixelGroup)]
   #Take the median climate variables for each pixel group
-  out <- climateMatch[, list("mCMD" = median(mCMD, na.rm = TRUE), "mATA" = median(mATA, na.rm = TRUE)), by = "pixelGroup"]
+  out <- climateMatch[, list("mCMI" = median(mCMI, na.rm = TRUE), "mATA" = median(mATA, na.rm = TRUE)), by = "pixelGroup"]
 
   #summarize cohortData by biomass
   cohortData <- cohortData[, list(age = max(age), B = sum(B)), by = "pixelGroup"]
