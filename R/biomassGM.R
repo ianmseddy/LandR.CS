@@ -39,26 +39,33 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   #Join cohort Data with climate data
   predData <- out[cohortData]
 
-  #make prediction
-  growthPred <- predict(gcsModel, predData,
-                        level = 0, asList = TRUE)
-  if (anyNA(growthPred)) {
-    browser()
-  }
+  #Create the 'avg climate' dataset to normalize the prediction
+  browser()
+  avgClim <- predData[mCMI := 0]
+  avgClim$mATA <- 0
+
+  #make growth prediction
+  growthPred <- predict(gcsModel, predData, level = 0, asList = TRUE) -
+    predict(gcsModel, avgClim, level = 0, asList = TRUE)
+
   #Prediction is in tons/ha, must be rescaled to g/m2
   #1000000 g/10000 m2 = 100 * g/m2
   growthPred <- growthPred * 100
 
+  #make mortality prediction
   mortPred <- predict(mcsModel, predData, level = 0, asList = TRUE)
-  if (anyNA(growthPred)) {
-    browser()
+
+  if (anyNA(mortPred)) {
+    stop("error in climate mortality prediction. NA value returned")
   }
+  #back-transform
+  mortPred <- exp(mortPred) - centeringVec["minMort"]
+  #rescale to g/m2
   mortPred <- mortPred * 100
 
   climateEffect <- data.table("pixelGroup" = predData$pixelGroup,
                               "growthPred" = growthPred,
                               "mortPred" = mortPred)
-  #good work Ian
    return(climateEffect)
 }
 
