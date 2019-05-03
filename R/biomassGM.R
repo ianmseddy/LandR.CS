@@ -48,10 +48,6 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   growthPred <- predict(gcsModel, predData, level = 0, asList = TRUE) -
     predict(gcsModel, avgClim, level = 0, asList = TRUE)
 
-  #Prediction is in tons/ha, must be rescaled to g/m2
-  #1000000 g/10000 m2 = 100 * g/m2
-  growthPred <- growthPred * 100
-
   #make mortality prediction
   mortPred <- predict(mcsModel, predData, level = 0, asList = TRUE)
   #back transform
@@ -67,9 +63,6 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   if (anyNA(mortPred)) {
     stop("error in climate mortality prediction. NA value returned")
   }
-
-  #rescale to g/m2
-  mortPred <- mortPred * 100
 
   climateEffect <- data.table("pixelGroup" = predData$pixelGroup,
                               "growthPred" = growthPred,
