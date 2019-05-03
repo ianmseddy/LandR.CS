@@ -23,7 +23,6 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
   #Center observations on mean of original model data
-  browser()
   climateMatch <- data.table("pixelGroup" = pixels,
                              "mCMI" = CMIvals - centeringVec["CMI"],
                              "mATA" = ATAvals - centeringVec["ATA"])
@@ -41,7 +40,6 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   predData <- out[cohortData]
 
   #Create the 'avg climate' dataset to normalize the prediction
-
   avgClim <- predData
   avgClim$mCMI <- 0
   avgClim$mATA <- 0
@@ -55,14 +53,21 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   growthPred <- growthPred * 100
 
   #make mortality prediction
-  mortPred <- predict(mcsModel, predData, level = 0, asList = TRUE) -
-    predict(mcsModel, avgClim, level = 0, asList = TRUE)
+  mortPred <- predict(mcsModel, predData, level = 0, asList = TRUE)
+  #back transform
+  mortPred <- exp(mortPred) - centeringVec['minMort']
+
+  #predict the 'average climate' mortality
+  nullMort <- predict(mcsModel, avgClim, level = 0, asList = TRUE)
+  #back transform
+  nullMort <- exp(nullMort) - centeringVec['minMort']
+
+  mortPred <- mortPred - nullMort
 
   if (anyNA(mortPred)) {
     stop("error in climate mortality prediction. NA value returned")
   }
-  #back-transform
-  mortPred <- exp(mortPred) - centeringVec["minMort"]
+
   #rescale to g/m2
   mortPred <- mortPred * 100
 
