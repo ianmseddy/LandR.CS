@@ -1,5 +1,5 @@
 Package: LandR.CS
-Title: What the Package Does (one line, title case)
+Title: Climate-sensitive Growth and Mortality in LandR 
 Version: 0.0.0.9000
 Authors@R: person("Ian", "Eddy", email = "ian.eddy@canada.ca", role = c("aut", "cre"))
 Description: Climate-sensitive processes for LandR. These include growth and mortality.
