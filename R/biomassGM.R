@@ -19,9 +19,17 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   if (is.null(CMI)) {
     stop("Missing climate data needed to run LandR.CS - consider running module gmcsDataPrep and PSP_Clean")
   }
+
+
   CMIvals <- getValues(CMI)
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
+
+  #if all values are 0, its because the current time is before 2011
+  if (all(unique(CMIvals) == 0, na.rm = TRUE)) {
+    return(NULL)
+  }
+
   #Center observations on mean of original model data
   climateMatch <- data.table("pixelGroup" = pixels,
                              "mCMI" = CMIvals - centeringVec["CMI"],
@@ -67,7 +75,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   climateEffect <- data.table("pixelGroup" = predData$pixelGroup,
                               "growthPred" = growthPred,
                               "mortPred" = mortPred)
-   return(climateEffect)
+  return(climateEffect)
 }
 
 
@@ -82,6 +90,11 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 #' @export
 #' @rdname assignClimateEffect
 assignClimateEffect <- function(subCohortData, predObj, type){
+
+  #if predObj is null, the time must be before 2011.
+  if (is.null(predObj)) {
+    return(0)
+  }
 
   subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B, 'aNPPAct' = aNPPAct)]
 
