@@ -20,7 +20,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   if (is.null(CMI)) {
     stop("Missing climate data needed to run LandR.CS - consider running module gmcsDataPrep and PSP_Clean")
   }
-
+  browser()
 
   CMIvals <- getValues(CMI)
   CMInormalvals <- getValues(CMInormal)
