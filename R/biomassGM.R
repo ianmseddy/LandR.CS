@@ -46,7 +46,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 
   #summarize cohortData by biomass
   cohortData <- cohortData[, list(age = max(age), B = sum(B)), by = "pixelGroup"]
-  cohortData$LogAge <- log(cohortData$age)
+  cohortData$logAge <- log(cohortData$age)
   setkey(cohortData, pixelGroup)
   setkey(out, pixelGroup)
   #Join cohort Data with climate data
