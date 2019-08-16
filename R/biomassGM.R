@@ -9,19 +9,21 @@
 #' @param mcsModel climate-sensitive mortality mixed effect model object created by gmcsDataPrep
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
 #' @param centeringVec the means of the data used to create gcsModel and mcsModel
+#' @param CMInormal raster of CMI normals for 1950-2010
 #' @importFrom data.table setkey data.table
 #' @importFrom stats median
 #' @importFrom raster getValues
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
-                                   pixelGroupMap, centeringVec){
+                                   pixelGroupMap, centeringVec, CMInormal){
   if (is.null(CMI)) {
     stop("Missing climate data needed to run LandR.CS - consider running module gmcsDataPrep and PSP_Clean")
   }
 
 
   CMIvals <- getValues(CMI)
+  CMInormalvals <- getValues(CMInormal)
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
 
@@ -32,16 +34,19 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 
   #Center observations on mean of original model data
   climateMatch <- data.table("pixelGroup" = pixels,
-                             "mCMI" = CMIvals - centeringVec["CMI"],
-                             "mATA" = ATAvals - centeringVec["ATA"])
+                             "CMI" = CMIvals,
+                             "ATA" = ATAvals,
+                             'CMInormal' = CMInormalvals)
 
   climateMatch <- climateMatch[!is.na(pixelGroup)]
   #Take the median climate variables for each pixel group
-  out <- climateMatch[, list("mCMI" = median(mCMI, na.rm = TRUE), "mATA" = median(mATA, na.rm = TRUE)), by = "pixelGroup"]
+  out <- climateMatch[, list("CMI" = median(CMI, na.rm = TRUE),
+                             "ATA" = median(ATA, na.rm = TRUE),
+                             "CMInormal" = median(CMInormal)), by = "pixelGroup"]
 
   #summarize cohortData by biomass
   cohortData <- cohortData[, list(age = max(age), B = sum(B)), by = "pixelGroup"]
-  cohortData$mLogAge <- log(cohortData$age) - centeringVec["logAge"]
+  cohortData$LogAge <- log(cohortData$age)
   setkey(cohortData, pixelGroup)
   setkey(out, pixelGroup)
   #Join cohort Data with climate data
@@ -49,8 +54,8 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 
   #Create the 'avg climate' dataset to normalize the prediction
   avgClim <- predData
-  avgClim$mCMI <- 0
-  avgClim$mATA <- 0
+  avgClim$CMI <- predData$CMInormal #replace CMI with the CMI normal for 1950-2010
+  avgClim$ATA <- 0 #the anomaly by definition has 0 as nromal
 
   #make growth prediction
   growthPred <- predict(gcsModel, predData, level = 0, asList = TRUE) -
