@@ -60,14 +60,14 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   predData[, CMInormal := NULL]
 
   #make growth prediction as ratio
-  growthPred <- predict(gcsModel, predData, level = 0, asList = TRUE)/
-    predict(gcsModel, refClim, level = 0, asList = TRUE) * 100
+  growthPred <- asInteger(predict(gcsModel, predData, level = 0, asList = TRUE)/
+    predict(gcsModel, refClim, level = 0, asList = TRUE) * 100)
   growthPred[growthPred < min(gmcsPctLimits)] <- min(gmcsPctLimits)
   growthPred[growthPred > max(gmcsPctLimits)] <- max(gmcsPctLimits)
 
   #make mortality prediction
-  mortPred <- predict(object = mcsModel, parameter ='mu', newdata = predData, level = 0, asList = TRUE)/
-   predict(object = mcsModel, parameter = 'mu', newdata = refClim, level = 0, asList = TRUE) * 100
+  mortPred <- asInteger(predict(object = mcsModel, parameter ='mu', newdata = predData, level = 0, asList = TRUE)/
+   predict(object = mcsModel, parameter = 'mu', newdata = refClim, level = 0, asList = TRUE) * 100)
   mortPred[mortPred < min(gmcsPctLimits)] <- min(gmcsPctLimits)
   mortPred[mortPred > max(gmcsPctLimits)] <- max(gmcsPctLimits)
 
