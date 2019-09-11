@@ -8,20 +8,18 @@
 #' @param gcsModel climate-sensitive growth mixed effect model object created by gmcsDataPrep
 #' @param mcsModel climate-sensitive mortality mixed effect model object created by gmcsDataPrep
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
-#' @param centeringVec the means of the data used to create gcsModel and mcsModel
 #' @param CMInormal raster of CMI normals for 1950-2010
+#' @param gmcsPctLimits lower and upper limits to the effect of climate on growth/mortality
 #' @importFrom data.table setkey data.table
 #' @importFrom stats median
 #' @importFrom raster getValues
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
-                                   pixelGroupMap, centeringVec, CMInormal){
+                                   pixelGroupMap, centeringVec, CMInormal, gmcsPctLimits){
   if (is.null(CMI)) {
     stop("Missing climate data needed to run LandR.CS - consider running module gmcsDataPrep and PSP_Clean")
   }
-  browser()
-
   CMIvals <- getValues(CMI)
   CMInormalvals <- getValues(CMInormal)
   ATAvals <- getValues(ATA)
@@ -39,42 +37,42 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
                              'CMInormal' = CMInormalvals)
 
   climateMatch <- climateMatch[!is.na(pixelGroup)]
-  #Take the median climate variables for each pixel group
-  out <- climateMatch[, list("CMI" = median(CMI, na.rm = TRUE),
+  #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
+  climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
                              "ATA" = median(ATA, na.rm = TRUE),
                              "CMInormal" = median(CMInormal)), by = "pixelGroup"]
 
-  #summarize cohortData by biomass
-  cohortData <- cohortData[, list(age = max(age), B = sum(B)), by = "pixelGroup"]
   cohortData$logAge <- log(cohortData$age)
   setkey(cohortData, pixelGroup)
-  setkey(out, pixelGroup)
+  setkey(climValues, pixelGroup)
+
   #Join cohort Data with climate data
-  predData <- out[cohortData]
 
-  #Create the 'avg climate' dataset to normalize the prediction
-  avgClim <- predData
-  avgClim$CMI <- predData$CMInormal #replace CMI with the CMI normal for 1950-2010
-  avgClim$ATA <- 0 #the anomaly by definition has 0 as nromal
+  predData <- cohortData[climValues][, .(logAge, ATA, CMI, CMInormal)]
+  predData <- predData[!is.na(logAge)] #this is possible due to pixelGroup 0 from climate data
 
-  #make growth prediction
-  growthPred <- predict(gcsModel, predData, level = 0, asList = TRUE) -
-    predict(gcsModel, avgClim, level = 0, asList = TRUE)
+  #Create the 'reference climate' dataset to normalize the prediction
+  refClim <- predData
+  refClim$CMI <- refClim$CMInormal #replace CMI with the CMI normal for 1950-2010
+  refClim$ATA <- 0 #the anomaly by definition has 0 as nromal
+
+  refClim[, CMInormal := NULL] #or the mortality model will be upset
+  predData[, CMInormal := NULL]
+
+  #make growth prediction as ratio
+  growthPred <- predict(gcsModel, predData, level = 0, asList = TRUE)/
+    predict(gcsModel, refClim, level = 0, asList = TRUE) * 100
+  growthPred[growthPred < min(gmcsPctLimits)] <- min(gmcsPctLimits)
+  growthPred[growthPred > max(gmcsPctLimits)] <- max(gmcsPctLimits)
 
   #make mortality prediction
-  mortPred <- predict(mcsModel, predData, level = 0, asList = TRUE)
-  #back transform
-  mortPred <- exp(mortPred) - centeringVec['minMort']
+  mortPred <- predict(object = mcsModel, parameter ='mu', newdata = predData, level = 0, asList = TRUE)/
+   predict(object = mcsModel, parameter = 'mu', newdata = refClim, level = 0, asList = TRUE) * 100
+  mortPred[mortPred < min(gmcsPctLimits)] <- min(gmcsPctLimits)
+  mortPred[mortPred > max(gmcsPctLimits)] <- max(gmcsPctLimits)
 
-  #predict the 'average climate' mortality
-  nullMort <- predict(mcsModel, avgClim, level = 0, asList = TRUE)
-  #back transform
-  nullMort <- exp(nullMort) - centeringVec['minMort']
-
-  mortPred <- mortPred - nullMort
-
-  if (anyNA(mortPred)) {
-    stop("error in climate mortality prediction. NA value returned")
+  if (anyNA(c(mortPred, growthPred))) {
+    stop("error in climate prediction. NA value returned - this will break LANDR downstream")
   }
 
   climateEffect <- data.table("pixelGroup" = predData$pixelGroup,
@@ -84,47 +82,160 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 }
 
 
-#'  assignClimateEffect
-#'
-#'  Calculates climate-dependent mortality and growth proportional to
-#'  each cohorts biomass in the pixelGroup
-#'
-#' @param subCohortData The LandR cohortData object
-#' @param predObj climate prediction object
-#' @param type predict growth or mortality
+#'  own
+#'  for predicting from gamlss with no random effect
+#' @param fixed the fixed terms
+#' @param random the random terms
+#' @param correlation this is the correlation structure?
+#' @param method Ceres help me
+#' @param level the marginal or conditional predictor
+#' @importFrom nlme lmeControl
+#' @rdname own
 #' @export
-#' @rdname assignClimateEffect
-assignClimateEffect <- function(subCohortData, predObj, type){
-
-  #if predObj is null, the time must be before 2011.
-  if (is.null(predObj)) {
-    return(0)
+own <-function(fixed=~1, random = NULL, correlation = NULL, method = "ML",
+               level = NULL, ...)
+{
+  #------------------------------------------
+  # function starts here
+  #------------------------------------------
+  scall <- deparse(sys.call(), width.cutoff = 500L) #
+  if (!is(fixed, "formula")) stop("fixed argument in lme() needs a formula starting with ~")
+  #if (!is(random, "formula")) stop("formula argument in lme() needs a formula starting with ~")
+  # we have to do somehing with corelation
+  # if (!is.null(correlation)) {
+  #   cor.for <- attr(correlation, "formula")
+  #   if (!is.null(cor.for))
+  #     cor.vars <- all.vars(cor.for)
+  # }
+  # else cor.vars <- NULL
+  # get where "gamlss" is in system call
+  # it can be in gamlss() or predict.gamlss()
+  rexpr <- grepl("gamlss",sys.calls()) ##
+  for (i in length(rexpr):1)
+  {
+    position <- i # get the position
+    if (rexpr[i]==TRUE) break
   }
+  #
+  gamlss.env <- sys.frame(position) #gamlss or predict.gamlss
+  ##--- get the lme control values
+  control  <- lmeControl(...)
+  ## get the data
+  if (sys.call(position)[1]=="predict.gamlss()")
+  { # if predict is used
+    Data <- get("data", envir=gamlss.env)
+  }
+  else if (sys.call(position)[1]=="gamlss()")
+  { # if gamlss() is used
+    if (is.null(get("gamlsscall", envir=gamlss.env)$data))
+    { # if no data argument but the formula can be interpreted
+      Data <- model.frame(formula)
+    }
+    else
+    {# data argument in gamlss
+      Data <- get("gamlsscall", envir=gamlss.env)$data
+    }
+  }
+  else  {Data <- get("data", envir=gamlss.env)}
+  Data <- if (any(attributes(eval(substitute(Data)))$class=="groupedData")) eval(substitute(Data))
+  else data.frame(eval(substitute(Data)))
+  #=====
+  len <- dim(Data)[1] # get the lenth of the data
+  ## out
+  xvar <- rep(0,  len) # model.matrix(as.formula(paste(paste("~",ff, sep=""), "-1", sep="")), data=Data) #
+  attr(xvar,"fixed")       <- fixed
+  attr(xvar,"random")      <- random
+  attr(xvar,"method")      <- method
+  attr(xvar,"correlation") <- correlation
+  attr(xvar,"level")       <- level
+  attr(xvar,"control")     <- control
+  attr(xvar, "gamlss.env") <- gamlss.env
+  if (any(attributes(Data)$class=="groupedData")) {
+    attr(xvar, "data") <- Data } else {
+      attr(xvar, "data") <- as.data.frame(Data)
+    }
+  attr(xvar, "call")       <- substitute(gamlss.own(data[[scall]], z, w, ...))
+  attr(xvar, "class")      <- "smooth"
+  xvar
+}
 
-  subCohorts <- subCohortData[,.("pixelGroup" = pixelGroup, "B" = B, 'aNPPAct' = aNPPAct)]
 
-  #Mortality is proportional to each cohort's biomass
-  if (type == 'mortPred') {
-    subCohorts[, "sumB" := sum(B), by = "pixelGroup"]
-    subCohorts[, "propB" := B/sumB,]
-    #subCohortData should be sorted on pixelGroup. Need to preserve original order
-    subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
-    setkey(subCohorts, "pixelGroup")
-    setkey(predObj, "pixelGroup")
-    subCohorts <- predObj[subCohorts]
-    subCohorts[, "climStat" := eval(parse(text = type)) * propB]
+
+#' gamlss.own
+#' the definition of the backfitting additive function, Authors: Mikis Stasinopoulos, Marco Enea
+#' @param x this is a param
+#' @param y I don't know what this is
+#' @param w I don't know what these are
+#' @importFrom nlme lme
+#' @rdname gamlss.own
+#' @export
+gamlss.own <- function(x, y, w, xeval = NULL, ...)
+{
+  fixed <- attr(x, "fixed")
+  random <- attr(x, "random")
+  correlation <- attr(x, "correlation")
+  method <- attr(x, "method")
+  level <- attr(x, "level")
+  fix.formula <-
+    as.formula(paste("Y.var", deparse(fixed, width.cutoff = 500L), sep = ""))
+  control <- as.list(attr(x, "control"))
+  #gamlss.env <- as.environment(attr(x, "gamlss.env"))
+  OData <- attr(x, "data")
+  Data <-  if (is.null(xeval))
+    OData #the trick is for prediction
+  else
+    OData[seq(1, length(y)), ]
+  if (any(attributes(Data)$class == "groupedData")) {
+    Data$W.var <- 1 / w
+    Data$Y.var <- y
   } else {
-    #Growth is proportionalt o each cohort's annual net primary productivity
-    subCohorts[, "sumANPP" := sum(aNPPAct), by = "pixelGroup"]
-    subCohorts[, "propANPP" := aNPPAct/sumANPP,]
-    #subCohortData should be sorted on pixelGroup. Need to preserve original order
-    subCohorts[, "rowOrder" := as.numeric(row.names(subCohorts))]
-    setkey(subCohorts, "pixelGroup")
-    setkey(predObj, "pixelGroup")
-    subCohorts <- predObj[subCohorts]
-    subCohorts[, "climStat" := eval(parse(text = type)) * propANPP]
+    Y.var <- y
+    W.var <- 1 / w
+    Data <- data.frame(eval(substitute(Data)), Y.var, W.var)
   }
-  setkey(subCohorts, "rowOrder") #Back to original order
-  return(subCohorts$climStat)
-
+  #       Data <- data.frame(eval(substitute(Data)),y,wei=1/w)
+  # fit  <-  lme(All$fixed, data = Data, random=All$random, weights=varFixed(~wei),  method="ML")
+  #
+  #              (fixed, data = sys.frame(sys.parent()), random, correlation = NULL,
+  #           weights = NULL, subset, method = c("REML", "ML"), na.action = na.fail,
+  #           control = list(), contrasts = NULL, keep.data = TRUE)
+  # lme(fixed = fixed, random = random, data = data,
+  #    correlation = correlation, control = control, weights = varFixed(w.formula),
+  #    method = "ML", ...)
+  fit <- lme(fixed = fix.formula,
+             data = Data,
+             random = random,
+             weights = varFixed( ~ W.var),
+             correlation = correlation,
+             control = control,
+             method = method
+  )
+  fv <- fitted(fit)
+  residuals <- y - fv
+  N <- sum(w != 0)
+  df <-  N - (sum(w * (y - fv) ^ 2)) / (fit$sigma ^ 2)
+  if (is.null(xeval)){
+    list(
+      fitted.values = fv,
+      residuals = residuals,
+      nl.df = df - 1,
+      lambda = fit$sigma,
+      # Mikis 10-6-19 df should be df-1 not df
+      coefSmo = fit,
+      var = NA
+    )    # var=fv has to fixed
+  }
+  else {
+    # ll<-dim(OData)[1]
+    # assign("fix.formula",fix.formula,envir=globalenv())
+    # on.exit(rm(fix.formula,envir=globalenv()))
+    # pred <- eval(expression(predict(fit,newdata = OData[seq(length(y)+1,ll),])),envir=environment() )
+    fit$call$fixed <- substitute(fix.formula)
+    ll <- dim(OData)[1]
+    pred <-
+      if (is.null(level))
+        predict(fit, newdata = OData[seq(length(y) + 1, ll), ])
+    else
+      predict(fit, newdata = OData[seq(length(y) + 1, ll), ], level = level)
+  }
 }

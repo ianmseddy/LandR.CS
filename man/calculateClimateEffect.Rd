@@ -5,7 +5,7 @@
 \title{CalculateClimateEffect}
 \usage{
 calculateClimateEffect(cohortData, CMI, ATA, gcsModel, mcsModel,
-  pixelGroupMap, centeringVec, CMInormal)
+  pixelGroupMap, centeringVec, CMInormal, gmcsPctLimits)
 }
 \arguments{
 \item{cohortData}{The LandR cohortData object}
@@ -20,9 +20,9 @@ calculateClimateEffect(cohortData, CMI, ATA, gcsModel, mcsModel,
 
 \item{pixelGroupMap}{the pixelGroupMap needed to match cohorts with raster values}
 
-\item{centeringVec}{the means of the data used to create gcsModel and mcsModel}
-
 \item{CMInormal}{raster of CMI normals for 1950-2010}
+
+\item{gmcsPctLimits}{lower and upper limits to the effect of climate on growth/mortality}
 }
 \description{
 Predict biomass change with climate variables
