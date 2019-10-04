@@ -27,7 +27,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 
   #if all values are 0, its because the current time is before 2011
   if (all(unique(CMIvals) == 0, na.rm = TRUE)) {
-    return(NULL)
+    return(data.table('mortPred' = 100, 'growthPred' = 100))
   }
 
   #Center observations on mean of original model data
