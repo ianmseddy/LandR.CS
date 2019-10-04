@@ -13,7 +13,7 @@ RoxygenNote: 6.1.1
 Imports: 
   data.table,
   raster,
-  stats
+  stats,
+  glmm,
+  gamlss
 Suggests:
-  LandR
-
