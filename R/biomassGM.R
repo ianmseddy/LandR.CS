@@ -17,18 +17,15 @@
 #' @export
 calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
                                    pixelGroupMap, centeringVec, CMInormal, gmcsPctLimits){
-  if (is.null(CMI)) {
-    stop("Missing climate data needed to run LandR.CS - consider running module gmcsDataPrep and PSP_Clean")
+  if (is.null(CMI) & is.null(ATA)) {
+    message(paste("Missing climate data needed to run LandR.CS - consider running modules gmcsDataPrep and PSP_Clean",
+                  "if you were expecting climate impacts for this year"))
+    return(data.table('mortPred' = 100, 'growthPred' = 100))
   }
   CMIvals <- getValues(CMI)
   CMInormalvals <- getValues(CMInormal)
   ATAvals <- getValues(ATA)
   pixels <- getValues(pixelGroupMap)
-
-  #if all values are 0, its because the current time is before 2011
-  if (all(unique(CMIvals) == 0, na.rm = TRUE)) {
-    return(data.table('mortPred' = 100, 'growthPred' = 100))
-  }
 
   #Center observations on mean of original model data
   climateMatch <- data.table("pixelGroup" = pixels,
