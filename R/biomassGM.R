@@ -37,7 +37,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
   climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
                              "ATA" = median(ATA, na.rm = TRUE),
-                             "CMInormal" = median(CMInormal)), by = "pixelGroup"]
+                             "CMInormal" = median(CMInormal), na.rm = TRUE), by = "pixelGroup"]
 
   cohortData$logAge <- log(cohortData$age)
   setkey(cohortData, pixelGroup)
