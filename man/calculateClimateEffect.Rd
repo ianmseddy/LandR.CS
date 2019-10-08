@@ -5,7 +5,7 @@
 \title{CalculateClimateEffect}
 \usage{
 calculateClimateEffect(cohortData, CMI, ATA, gcsModel, mcsModel,
-  pixelGroupMap, centeringVec, CMInormal, gmcsPctLimits)
+  pixelGroupMap, CMInormal, gmcsPctLimits)
 }
 \arguments{
 \item{cohortData}{The LandR cohortData object}

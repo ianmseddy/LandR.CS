@@ -16,7 +16,7 @@
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
-                                   pixelGroupMap, centeringVec, CMInormal, gmcsPctLimits){
+                                   pixelGroupMap, CMInormal, gmcsPctLimits){
   if (is.null(CMI) & is.null(ATA)) {
     message(paste("Missing climate data needed to run LandR.CS - consider running modules gmcsDataPrep and PSP_Clean",
                   "if you were expecting climate impacts for this year"))
@@ -37,7 +37,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
   climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
                              "ATA" = median(ATA, na.rm = TRUE),
-                             "CMInormal" = median(CMInormal), na.rm = TRUE), by = "pixelGroup"]
+                             "CMInormal" = median(CMInormal, na.rm = TRUE)), by = "pixelGroup"]
 
   cohortData$logAge <- log(cohortData$age)
   setkey(cohortData, pixelGroup)
