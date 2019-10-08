@@ -32,29 +32,36 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
                              "CMI" = CMIvals,
                              "ATA" = ATAvals,
                              'CMInormal' = CMInormalvals)
-
-  climateMatch <- climateMatch[!is.na(pixelGroup)]
+  climateMatch <- na.omit(object = climateMatch, cols = "pixelGroup")
+  # climateMatch <- climateMatch[!is.na(pixelGroup)]
   #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
-  climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
-                             "ATA" = median(ATA, na.rm = TRUE),
-                             "CMInormal" = median(CMInormal), na.rm = TRUE), by = "pixelGroup"]
+  climValues <- climateMatch[, .("CMI" = as.numeric(median(CMI, na.rm = TRUE)),
+                                 "ATA" = as.numeric(median(ATA, na.rm = TRUE)),
+                                 "CMInormal" = as.numeric(median(CMInormal, na.rm = TRUE))),
+                                 by = "pixelGroup"]
 
-  cohortData$logAge <- log(cohortData$age)
+  cohortData[, logAge := log(age)]
   setkey(cohortData, pixelGroup)
   setkey(climValues, pixelGroup)
 
   #Join cohort Data with climate data
+  # Subset what needed from cohortData: logAge, pixelGroup
+  cohortDataSubset <- unique(cohortData[, .(logAge, pixelGroup)]) # there are pixelGroups without Age (is.na(logAge))!
+  predData <- na.omit(unique(merge(climValues, cohortDataSubset))) # There are some CMInormal that also don't have data (is.na(CMInormal))!
+  # Now we don't have any NA's in this object (predData)
 
-  predData <- cohortData[climValues][, .(logAge, ATA, CMI, CMInormal)]
-  predData <- predData[!is.na(logAge)] #this is possible due to pixelGroup 0 from climate data
+  # predData <- cohortData[climValues][, .(logAge, ATA, CMI, CMInormal)]
+  # predData <- predData[!is.na(logAge)] #this is possible due to pixelGroup 0 from climate data
 
   #Create the 'reference climate' dataset to normalize the prediction
   refClim <- predData
   refClim$CMI <- refClim$CMInormal #replace CMI with the CMI normal for 1950-2010
-  refClim$ATA <- 0 #the anomaly by definition has 0 as nromal
+  refClim$ATA <- 0 #the anomaly by definition has 0 as normal
 
-  refClim[, CMInormal := NULL] #or the mortality model will be upset
-  predData[, CMInormal := NULL]
+  setkey(predData, pixelGroup)
+  storePixelGroup <- predData$pixelGroup
+  refClim[, c("pixelGroup", "CMInormal") := NULL] #or the mortality model will be upset
+  predData[, c("pixelGroup", "CMInormal") := NULL]
 
   #make growth prediction as ratio
   growthPred <- asInteger(predict(gcsModel, predData, level = 0, asList = TRUE)/
@@ -72,7 +79,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
     stop("error in climate prediction. NA value returned - this will break LANDR downstream")
   }
 
-  climateEffect <- data.table("pixelGroup" = predData$pixelGroup,
+  climateEffect <- data.table("pixelGroup" = storePixelGroup,
                               "growthPred" = growthPred,
                               "mortPred" = mortPred)
   return(climateEffect)
