@@ -33,20 +33,28 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
                              "ATA" = ATAvals,
                              'CMInormal' = CMInormalvals)
 
-  climateMatch <- climateMatch[!is.na(pixelGroup)]
+  climateMatch <- climateMatch[!is.na(pixelGroup)] #Not all pixelGroups are in pixelGroupMap, because cohortData is a subset
   #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
   climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
                              "ATA" = median(ATA, na.rm = TRUE),
                              "CMInormal" = median(CMInormal, na.rm = TRUE)), by = "pixelGroup"]
 
-  cohortData$logAge <- log(cohortData$age)
+  cohortData[, logAge := log(age)]
   setkey(cohortData, pixelGroup)
   setkey(climValues, pixelGroup)
 
   #Join cohort Data with climate data
+  predData <- cohortData[climValues]
 
-  predData <- cohortData[climValues][, .(logAge, ATA, CMI, CMInormal)]
-  predData <- predData[!is.na(logAge)] #this is possible due to pixelGroup 0 from climate data
+  #remove NA values that exist only because of pixelGroupMap
+  predData <- na.omit(predData)
+
+  pixelGroupsPostSubset <- predData$pixelGroup
+  agePostSubset <- predData$age
+  speciesCodePostSubset <- predData$speciesCode
+
+  predData <- predData[, .(logAge, ATA, CMI, CMInormal)]
+
 
   #Create the 'reference climate' dataset to normalize the prediction
   refClim <- predData
@@ -56,6 +64,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   refClim[, CMInormal := NULL] #or the mortality model will be upset
   predData[, CMInormal := NULL]
 
+  browser()
   #make growth prediction as ratio
   growthPred <- asInteger(predict(gcsModel, predData, level = 0, asList = TRUE)/
     predict(gcsModel, refClim, level = 0, asList = TRUE) * 100)
@@ -72,9 +81,16 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
     stop("error in climate prediction. NA value returned - this will break LANDR downstream")
   }
 
-  climateEffect <- data.table("pixelGroup" = predData$pixelGroup,
+  climateEffect <- data.table("pixelGroup" = pixelGroupsPostSubset,
+                              'speciesCode' = speciesCodePostSubset,
+                              "age" = agePostSubset,
                               "growthPred" = growthPred,
                               "mortPred" = mortPred)
+
+  #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
+  climateEffect <- climateEffect[cohortData[, .(pixelGroup, speciesCode, age)], on = c('pixelGroup', 'speciesCode', 'age')]
+  climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
+
   return(climateEffect)
 }
 
