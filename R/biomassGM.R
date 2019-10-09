@@ -64,7 +64,6 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   refClim[, CMInormal := NULL] #or the mortality model will be upset
   predData[, CMInormal := NULL]
 
-  browser()
   #make growth prediction as ratio
   growthPred <- asInteger(predict(gcsModel, predData, level = 0, asList = TRUE)/
     predict(gcsModel, refClim, level = 0, asList = TRUE) * 100)
