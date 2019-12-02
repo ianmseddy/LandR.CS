@@ -1,6 +1,6 @@
 Package: LandR.CS
 Title: Climate-sensitive Growth and Mortality in LandR 
-Version: 0.0.0.9000
+Version: 0.0.0.9001
 Authors@R: person("Ian", "Eddy", email = "ian.eddy@canada.ca", role = c("aut", "cre"))
 Description: Climate-sensitive processes for LandR. These include growth and mortality.
     Some flexibility exists in how climate-sensitivity is derived, however the simplest
