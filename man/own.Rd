@@ -5,8 +5,14 @@
 \title{own
  for predicting from gamlss with no random effect}
 \usage{
-own(fixed = ~1, random = NULL, correlation = NULL, method = "ML",
-  level = NULL, ...)
+own(
+  fixed = ~1,
+  random = NULL,
+  correlation = NULL,
+  method = "ML",
+  level = NULL,
+  ...
+)
 }
 \arguments{
 \item{fixed}{the fixed terms}

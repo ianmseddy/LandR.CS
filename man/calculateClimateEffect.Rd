@@ -4,8 +4,16 @@
 \alias{calculateClimateEffect}
 \title{CalculateClimateEffect}
 \usage{
-calculateClimateEffect(cohortData, CMI, ATA, gcsModel, mcsModel,
-  pixelGroupMap, CMInormal, gmcsPctLimits)
+calculateClimateEffect(
+  cohortData,
+  CMI,
+  ATA,
+  gcsModel,
+  mcsModel,
+  pixelGroupMap,
+  CMInormal,
+  gmcsPctLimits
+)
 }
 \arguments{
 \item{cohortData}{The LandR cohortData object}
