@@ -104,6 +104,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 #' @param method Ceres help me
 #' @param level the marginal or conditional predictor
 #' @importFrom nlme lmeControl
+#' @importFrom reproducible .grepSysCalls
 #' @rdname own
 #' @export
 own <-function(fixed=~1, random = NULL, correlation = NULL, method = "ML",
@@ -124,12 +125,15 @@ own <-function(fixed=~1, random = NULL, correlation = NULL, method = "ML",
   # else cor.vars <- NULL
   # get where "gamlss" is in system call
   # it can be in gamlss() or predict.gamlss()
-  rexpr <- grepl("gamlss",sys.calls()) ##
-  for (i in length(rexpr):1)
-  {
-    position <- i # get the position
-    if (rexpr[i]==TRUE) break
-  }
+
+  # use `tail` because there may be more than one gamlss, e.g., with system.call(gamlss).
+  #  take the last one ... thus tail(..., 1)
+  position <- tail(reproducible::.grepSysCalls(sys.calls(), "gamlss"), 1)
+  # for (i in length(rexpr):1)
+  # {
+  #   position <- i # get the position
+  #   if (rexpr[i]==TRUE) break
+  # }
   #
   gamlss.env <- sys.frame(position) #gamlss or predict.gamlss
   ##--- get the lme control values
