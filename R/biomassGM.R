@@ -36,8 +36,8 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   climateMatch <- climateMatch[!is.na(pixelGroup)] #Not all pixelGroups are in pixelGroupMap, because cohortData is a subset
   #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
   climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
-                             "ATA" = median(ATA, na.rm = TRUE),
-                             "CMInormal" = median(CMInormal, na.rm = TRUE)), by = "pixelGroup"]
+                                 "ATA" = median(ATA, na.rm = TRUE),
+                                 "CMInormal" = median(CMInormal, na.rm = TRUE)), by = "pixelGroup"]
 
   cohortData[, logAge := log(age)]
   setkey(cohortData, pixelGroup)
@@ -66,7 +66,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 
   #make growth prediction as ratio
   growthPred <- asInteger(predict(gcsModel, predData, level = 0, asList = TRUE, type = "response")/
-    predict(gcsModel, refClim, level = 0, asList = TRUE, type = "response") * 100)
+                            predict(gcsModel, refClim, level = 0, asList = TRUE, type = "response") * 100)
   growthPred[growthPred < min(gmcsPctLimits)] <- min(gmcsPctLimits)
   growthPred[growthPred > max(gmcsPctLimits)] <- max(gmcsPctLimits)
 
@@ -154,7 +154,9 @@ own <-function(fixed=~1, random = NULL, correlation = NULL, method = "ML",
       Data <- get("gamlsscall", envir=gamlss.env)$data
     }
   }
-  else  {Data <- get("data", envir=gamlss.env)}
+  else  {
+    Data <- get("data", envir=gamlss.env)
+  }
   Data <- if (any(attributes(eval(substitute(Data)))$class=="groupedData")) eval(substitute(Data))
   else data.frame(eval(substitute(Data)))
   #=====
