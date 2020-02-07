@@ -22,6 +22,15 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
                   "if you were expecting climate impacts for this year"))
     return(data.table('mortPred' = 100, 'growthPred' = 100))
   }
+
+  if (ncell(CMI) != ncell(CMInormal)) {
+    stop("different number of pixels in the climate data. Please review how these are created")
+  }
+
+  if (crs(ATA) != crs(CMInormal)) {
+    stop("CRS of climate data is not identical. Please review how these are created")
+  }
+
   CMIvals <- getValues(CMI)
   CMInormalvals <- getValues(CMInormal)
   ATAvals <- getValues(ATA)
