@@ -14,8 +14,7 @@
 #' @param gmcsMinAge mininmum age for which to predict growth/mortality
 #' @importFrom data.table setkey data.table
 #' @importFrom stats median
-#' @importFrom raster getValues
-#' @importFrom LandR projection
+#' @importFrom raster getValues projection
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
