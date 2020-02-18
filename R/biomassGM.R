@@ -8,15 +8,19 @@
 #' @param gcsModel climate-sensitive growth mixed effect model object created by gmcsDataPrep
 #' @param mcsModel climate-sensitive mortality mixed effect model object created by gmcsDataPrep
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
-#' @param CMInormal raster of CMI normals for 1950-2010
-#' @param gmcsPctLimits lower and upper limits to the effect of climate on growth/mortality
+#' @param CMInormal raster of CMI normals the reference period
+#' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
+#' @param gmcsMortLimits lower and upper limits to the effect of climate on mortality
+#' @param gmcsMinAge mininmum age for which to predict growth/mortality
 #' @importFrom data.table setkey data.table
 #' @importFrom stats median
 #' @importFrom raster getValues
+#' @importFrom LandR projection
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
-                                   pixelGroupMap, CMInormal, gmcsPctLimits){
+                                   pixelGroupMap, CMInormal,
+                                   gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge){
   if (is.null(CMI) & is.null(ATA)) {
     message(paste("Missing climate data needed to run LandR.CS - consider running modules gmcsDataPrep and PSP_Clean",
                   "if you were expecting climate impacts for this year"))
@@ -27,7 +31,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
     stop("different number of pixels in the climate data. Please review how these are created")
   }
 
-  if (crs(ATA) != crs(CMInormal)) {
+  if (projection(ATA) != projection(CMInormal)) {
     stop("CRS of climate data is not identical. Please review how these are created")
   }
 
@@ -64,7 +68,6 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
 
   predData <- predData[, .(logAge, ATA, CMI, CMInormal)]
 
-
   #Create the 'reference climate' dataset to normalize the prediction
   refClim <- predData
   refClim$CMI <- refClim$CMInormal #replace CMI with the CMI normal for 1950-2010
@@ -76,16 +79,18 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   #make growth prediction as ratio
   growthPred <- asInteger(predict(gcsModel, predData, level = 0, asList = TRUE, type = "response")/
                             predict(gcsModel, refClim, level = 0, asList = TRUE, type = "response") * 100)
-  growthPred[growthPred < min(gmcsPctLimits)] <- min(gmcsPctLimits)
-  growthPred[growthPred > max(gmcsPctLimits)] <- max(gmcsPctLimits)
+  growthPred[growthPred < min(gmcsGrowthLimits)] <- min(gmcsGrowthLimits)
+  growthPred[growthPred > max(gmcsGrowthLimits)] <- max(gmcsGrowthLimits)
 
   #make mortality prediction
   mortPred <- asInteger(predict(object = mcsModel, parameter ='mu',
                                 newdata = predData, level = 0, asList = TRUE, type = "response")/
    predict(object = mcsModel, parameter = 'mu', newdata = refClim,
            level = 0, asList = TRUE, type = "response") * 100)
-  mortPred[mortPred < min(gmcsPctLimits)] <- min(gmcsPctLimits)
-  mortPred[mortPred > max(gmcsPctLimits)] <- max(gmcsPctLimits)
+
+  mortPred[mortPred < min(gmcsMortLimits)] <- min(gmcsMortLimits)
+  mortPred[mortPred > max(gmcsMortLimits)] <- max(gmcsMortLimits)
+
 
   if (anyNA(c(mortPred, growthPred))) {
     stop("error in climate prediction. NA value returned - this will break LANDR downstream")
@@ -97,8 +102,12 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
                               "growthPred" = growthPred,
                               "mortPred" = mortPred)
 
-  #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
+  #restrict predictions to those above min stand age
+  climateEffect[age < gmcsMinAge, mortPred := 100]
+  climateEffect[age < gmcsMinAge, growthPred := 100]
+
   climateEffect <- climateEffect[cohortData[, .(pixelGroup, speciesCode, age)], on = c('pixelGroup', 'speciesCode', 'age')]
+  #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
 
   return(climateEffect)

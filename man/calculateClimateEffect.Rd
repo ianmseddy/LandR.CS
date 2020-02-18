@@ -12,7 +12,9 @@ calculateClimateEffect(
   mcsModel,
   pixelGroupMap,
   CMInormal,
-  gmcsPctLimits
+  gmcsGrowthLimits,
+  gmcsMortLimits,
+  gmcsMinAge
 )
 }
 \arguments{
@@ -28,9 +30,13 @@ calculateClimateEffect(
 
 \item{pixelGroupMap}{the pixelGroupMap needed to match cohorts with raster values}
 
-\item{CMInormal}{raster of CMI normals for 1950-2010}
+\item{CMInormal}{raster of CMI normals the reference period}
 
-\item{gmcsPctLimits}{lower and upper limits to the effect of climate on growth/mortality}
+\item{gmcsGrowthLimits}{lower and upper limits to the effect of climate on growth}
+
+\item{gmcsMortLimits}{lower and upper limits to the effect of climate on mortality}
+
+\item{gmcsMinAge}{mininmum age for which to predict growth/mortality}
 }
 \description{
 Predict biomass change with climate variables
