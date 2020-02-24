@@ -108,6 +108,7 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   climateEffect <- climateEffect[cohortData[, .(pixelGroup, speciesCode, age)], on = c('pixelGroup', 'speciesCode', 'age')]
   #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
+  climateEffect[, logAge := NULL]
 
   return(climateEffect)
 }
