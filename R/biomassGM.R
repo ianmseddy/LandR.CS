@@ -15,13 +15,13 @@
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge){
-
+  browser()
   #extract relevant args
   ATA <- cceArgs$ATA
   CMI <- cceArgs$CMI
   CMInormal <- cceArgs$CMInormal
   mcsModel <- cceArgs$mcsModel
-  gcsModel <- cceArgs$gmcsModel
+  gcsModel <- cceArgs$gcsModel
 
   if (ncell(CMI) != ncell(CMInormal)) {
     stop("different number of pixels in the climate data. Please review how these are created")
