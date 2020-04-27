@@ -2,13 +2,9 @@
 #'
 #'  Predict biomass change with climate variables
 #'
+#' @param cceArgs a list of datasets used by the climate function
 #' @param cohortData The LandR cohortData object
-#' @param CMI A raster with annual Cumulative Moisture Index values
-#' @param ATA A raster with annual temperature anomaly values
-#' @param gcsModel climate-sensitive growth mixed effect model object created by gmcsDataPrep
-#' @param mcsModel climate-sensitive mortality mixed effect model object created by gmcsDataPrep
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
-#' @param CMInormal raster of CMI normals the reference period
 #' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
 #' @param gmcsMortLimits lower and upper limits to the effect of climate on mortality
 #' @param gmcsMinAge mininmum age for which to predict growth/mortality
@@ -17,14 +13,15 @@
 #' @importFrom raster getValues projection
 #' @rdname calculateClimateEffect
 #' @export
-calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
-                                   pixelGroupMap, CMInormal,
+calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge){
-  if (is.null(CMI) & is.null(ATA)) {
-    message(paste("Missing climate data needed to run LandR.CS - consider running modules gmcsDataPrep and PSP_Clean",
-                  "if you were expecting climate impacts for this year"))
-    return(data.table('mortPred' = 100, 'growthPred' = 100))
-  }
+
+  #extract relevant args
+  ATA <- cceArgs$ATA
+  CMI <- cceArgs$CMI
+  CMInormal <- cceArgs$CMInormal
+  mcsModel <- cceArgs$mcsModel
+  gcsModel <- cceArgs$gmcsModel
 
   if (ncell(CMI) != ncell(CMInormal)) {
     stop("different number of pixels in the climate data. Please review how these are created")
@@ -84,8 +81,8 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   #make mortality prediction
   mortPred <- asInteger(predict(object = mcsModel, parameter ='mu',
                                 newdata = predData, level = 0, asList = TRUE, type = "response")/
-   predict(object = mcsModel, parameter = 'mu', newdata = refClim,
-           level = 0, asList = TRUE, type = "response") * 100)
+                          predict(object = mcsModel, parameter = 'mu', newdata = refClim,
+                                  level = 0, asList = TRUE, type = "response") * 100)
 
   mortPred[mortPred < min(gmcsMortLimits)] <- min(gmcsMortLimits)
   mortPred[mortPred > max(gmcsMortLimits)] <- max(gmcsMortLimits)
@@ -108,6 +105,14 @@ calculateClimateEffect <- function(cohortData, CMI, ATA, gcsModel, mcsModel,
   climateEffect <- climateEffect[cohortData[, .(pixelGroup, speciesCode, age)], on = c('pixelGroup', 'speciesCode', 'age')]
   #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
+
+
+  if (!any(is.null(cceArgs$transferTable), is.null(cceArgs$BECkey), is.null(cceArgs$projectedBEC))) {
+    #calculate genetic modifier
+
+    #There must be a provenance column in cohortData for this to work
+    browser()
+  }
 
   return(climateEffect)
 }

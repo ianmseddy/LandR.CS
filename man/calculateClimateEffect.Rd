@@ -6,12 +6,8 @@
 \usage{
 calculateClimateEffect(
   cohortData,
-  CMI,
-  ATA,
-  gcsModel,
-  mcsModel,
   pixelGroupMap,
-  CMInormal,
+  cceArgs,
   gmcsGrowthLimits,
   gmcsMortLimits,
   gmcsMinAge
@@ -20,17 +16,9 @@ calculateClimateEffect(
 \arguments{
 \item{cohortData}{The LandR cohortData object}
 
-\item{CMI}{A raster with annual Cumulative Moisture Index values}
-
-\item{ATA}{A raster with annual temperature anomaly values}
-
-\item{gcsModel}{climate-sensitive growth mixed effect model object created by gmcsDataPrep}
-
-\item{mcsModel}{climate-sensitive mortality mixed effect model object created by gmcsDataPrep}
-
 \item{pixelGroupMap}{the pixelGroupMap needed to match cohorts with raster values}
 
-\item{CMInormal}{raster of CMI normals the reference period}
+\item{cceArgs}{a list of datasets used by the climate function}
 
 \item{gmcsGrowthLimits}{lower and upper limits to the effect of climate on growth}
 
