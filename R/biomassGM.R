@@ -49,6 +49,8 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                  "CMInormal" = median(CMInormal, na.rm = TRUE)), by = "pixelGroup"]
 
   cohortData[, logAge := log(age)]
+  #set age = 0 to 1, to prevent -inf in prediction - this shouldn't affect predictions due to minimum age
+  cohortData[age == 0, logAge := 0]
   setkey(cohortData, pixelGroup)
   setkey(climValues, pixelGroup)
 
@@ -105,14 +107,6 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   climateEffect <- climateEffect[cohortData[, .(pixelGroup, speciesCode, age)], on = c('pixelGroup', 'speciesCode', 'age')]
   #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
-
-
-  if (!any(is.null(cceArgs$transferTable), is.null(cceArgs$BECkey), is.null(cceArgs$projectedBEC))) {
-    #calculate genetic modifier
-
-    #There must be a provenance column in cohortData for this to work
-    browser()
-  }
 
   return(climateEffect)
 }
