@@ -15,7 +15,7 @@
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge){
-  browser()
+
   #extract relevant args
   ATA <- cceArgs$ATA
   CMI <- cceArgs$CMI
