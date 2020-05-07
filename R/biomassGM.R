@@ -100,12 +100,41 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                               "growthPred" = growthPred,
                               "mortPred" = mortPred)
 
+  if (length(cceArgs) > 5) {
+
+    if (!any(is.null(cceArgs$transferTable), is.null(cceArgs$BECkey),
+             is.null(cceArgs$currentBEC), is.null(cceArgs$ecoregionMap))) {
+      #we do not want all the columns in cohortData, but we need ecoregionGroup and Provenance if present
+      if (is.null(cohortData$Provenance)) {
+        modCohortData <- cohortData[, .(pixelGroup, speciesCode, age, ecoregionGroup)]
+      } else {
+      modCohortData <- cohortData[, .(pixelGroup, speciesCode, age, ecoregionGroup, Provenance)]
+      }
+      geneticEffect <- calculateGeneticEffect(cohortData = modCohortData,
+                                              BECkey = cceArgs$BECkey,
+                                              pixelGroupMap = pixelGroupMap,
+                                              transferTable = cceArgs$transferTable,
+                                              ecoregionMap = cceArgs$ecoregionMap,
+                                              currentBEC = cceArgs$currentBEC)
+
+      setkey(climateEffect, pixelGroup, speciesCode, age)
+      setkey(geneticEffect, pixelGroup, speciesCode, age)
+      climateEffect <- geneticEffect[climateEffect]
+      climateEffect[, growthPred := asInteger(HTp_pred * growthPred)]
+      climateEffect[, HTp_pred := NULL] #get rid of this column
+
+    } else {
+      stop("cceArgs does not match methods available in LandR.CS")
+    }
+  }
+
   #restrict predictions to those above min stand age
   climateEffect[age < gmcsMinAge, mortPred := 100]
   climateEffect[age < gmcsMinAge, growthPred := 100]
 
   climateEffect <- climateEffect[cohortData[, .(pixelGroup, speciesCode, age)], on = c('pixelGroup', 'speciesCode', 'age')]
   #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
+
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
 
   return(climateEffect)
@@ -199,9 +228,9 @@ own <-function(fixed=~1, random = NULL, correlation = NULL, method = "ML",
 
 #' gamlss.own
 #' the definition of the backfitting additive function, Authors: Mikis Stasinopoulos, Marco Enea
-#' @param x this is a param
-#' @param y I don't know what this is
-#' @param w I don't know what these are
+#' @param x description missing
+#' @param y description missing
+#' @param w description missing
 #' @importFrom nlme lme
 #' @rdname gamlss.own
 #' @export
@@ -274,4 +303,92 @@ gamlss.own <- function(x, y, w, xeval = NULL, ...)
     else
       predict(fit, newdata = OData[seq(length(y) + 1, ll), ], level = level)
   }
+}
+
+
+#'  calculateGeneticEffect
+#'
+#'  Predict climate induced height reduction due to genetics
+#'
+#' @param BECkey a key that matches BECraster code with transfer table
+#' @param cohortData The LandR cohortData object
+#' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
+#' @param transferTable a table with genetic performance of species in each variant
+#' @param currentBEC the current projected BEC zone
+#' @param ecoregionMap a raster an RAT that matches ecoregionGroup to ecoregion
+#' @importFrom data.table setkey data.table
+#' @importFrom stats median
+#' @importFrom raster getValues projection
+#' @rdname calculateGeneticEffect
+#' @export
+calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTable, currentBEC, ecoregionMap){
+
+ #1. get BEC zones of each ecoregionGroup
+  ecoregionKey <- as.data.table(ecoregionMap@data@attributes[[1]])
+  setnames(ecoregionKey, 'ID', 'ecoregionMapCode') #Change ID, because ID in BECkey = ecoregion, not mapcode
+  BECkey[, ID := as.factor(as.character(ID))]
+
+  ecoregionKey <- BECkey[ecoregionKey, on = c("ID" = 'ecoregion')] #now we have zsv of cohortData$ecoregionGroup
+  ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
+
+#2. Find Provenance of cohortData
+  if (is.null(cohortData$Provenance)){
+    cohortDataSmall <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup)] %>%
+      ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
+    setnames(cohortDataSmall, 'zsv', 'Provenance')
+  } else {
+     cohortDataSmall <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, Provenance)] %>%
+      ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
+    setnames(cohortDataSmall, 'zsv', 'assumedProvenance')
+    cohortDataSmall[is.na(Provenance), Provenance := assumedProvenance]
+    cohortDataSmall[, assumedProvenance := NULL] #Confirm this doesn't erase parts of Provenance by reference
+  }
+
+#3. Assign the mode among projected BECs for each pixelGroup
+  projBEC <- data.table(pixelGroup = getValues(pixelGroupMap), BEC = getValues(currentBEC)) %>%
+    na.omit(.) %>%
+    .[, BEC := as.factor(BEC)]
+  projBEC <- projBEC[, .N, .(pixelGroup, BEC)]
+  projBEC[, modeBEC := max(N), .(pixelGroup)]
+  projBEC <- projBEC[N == modeBEC] %>%
+    .[, c('modeBEC', 'N') := NULL]
+
+  #Find ties
+  counts <- projBEC[, .N, .(pixelGroup)]
+  noTies <- projBEC[pixelGroup %in% counts[N == 1]$pixelGroup]
+  ties <- projBEC[pixelGroup %in% counts[N > 1]$pixelGroup]
+  rm(counts)
+  #randomly order, then remove duplicates
+  ties$foo <- sample(x = 1:nrow(ties), size = nrow(ties))
+  setkey(ties, foo)
+  ties <- ties[!duplicated(ties[, .(pixelGroup)])]
+  ties[, foo := NULL]
+  assignedBEC <- rbind(ties, noTies)
+  if (nrow(assignedBEC) != length(unique(projBEC$pixelGroup))) {
+    stop("Error: mismatch in pixelGroups and projected BECs, debug LandR.CS")
+  }
+  rm(ties, noTies, projBEC)
+
+#4.Join tables
+
+  assignedBEC <- BECkey[assignedBEC, on = c("ID" = 'BEC')] %>%
+    .[, .(pixelGroup, zsv)]
+  setnames(assignedBEC, old = 'zsv', new = 'currentClimate')
+  cohortData <- assignedBEC[cohortData, on = c('pixelGroup' = 'pixelGroup')]
+
+#5.Add Provenance if missing
+  cohortData <- ecoregionKeySmall[cohortData, on = c("ecoregionGroup" = 'ecoregionGroup')]
+
+  if (is.null(cohortData$Provenance)) {
+    cohortData[, Provenance := zsv]
+  } else {
+    cohortData[is.na(Provenance), Provenance := zsv]
+  }
+  cohortData[, zsv := NULL]
+  setnames(transferTable, old = c("BECvarfut_plantation", 'BECvar_seed'), new = c("currentClimate", "Provenance"))
+  cohortData <- transferTable[cohortData, on = c('currentClimate' = 'currentClimate',
+                                                  'Provenance' = 'Provenance',
+                                                  'speciesCode' = 'speciesCode')] %>%
+    .[, .(pixelGroup, ecoregionGroup, speciesCode, age, Provenance, HTp_pred)]
+  return(cohortData)
 }

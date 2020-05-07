@@ -8,11 +8,11 @@ the definition of the backfitting additive function, Authors: Mikis Stasinopoulo
 gamlss.own(x, y, w, xeval = NULL, ...)
 }
 \arguments{
-\item{x}{this is a param}
+\item{x}{description missing}
 
-\item{y}{I don't know what this is}
+\item{y}{description missing}
 
-\item{w}{I don't know what these are}
+\item{w}{description missing}
 }
 \description{
 gamlss.own
