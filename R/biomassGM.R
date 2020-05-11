@@ -15,6 +15,10 @@
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge){
+  cohortData <- copy(cohortData)
+  neededCols <- c("pixelGroup", 'speciesCode', 'age', 'B') %>%
+    .[. %in% colnames(cohortData)]
+  climCohortData <- cohortData[, ..neededCols]
 
   #extract relevant args
   ATA <- cceArgs$ATA
@@ -42,20 +46,20 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                              "ATA" = ATAvals,
                              'CMInormal' = CMInormalvals)
 
-  climateMatch <- climateMatch[!is.na(pixelGroup)] #Not all pixelGroups are in pixelGroupMap, because cohortData is a subset
+  climateMatch <- climateMatch[!is.na(pixelGroup)] #Not all pixelGroups are in pixelGroupMap, because climCohortData is a subset
   #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
   climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
                                  "ATA" = median(ATA, na.rm = TRUE),
                                  "CMInormal" = median(CMInormal, na.rm = TRUE)), by = "pixelGroup"]
 
-  cohortData[, logAge := log(age)]
+  climCohortData[, logAge := log(age)]
   #set age = 0 to 1, to prevent -inf in prediction - this shouldn't affect predictions due to minimum age
-  cohortData[age == 0, logAge := 0]
-  setkey(cohortData, pixelGroup)
+  climCohortData[age == 0, logAge := 0]
+  setkey(climCohortData, pixelGroup)
   setkey(climValues, pixelGroup)
 
   #Join cohort Data with climate data
-  predData <- cohortData[climValues]
+  predData <- climCohortData[climValues]
 
   #remove NA values that exist only because of pixelGroupMap
   predData <- na.omit(predData)
@@ -110,6 +114,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
       } else {
       modCohortData <- cohortData[, .(pixelGroup, speciesCode, age, ecoregionGroup, Provenance)]
       }
+
       geneticEffect <- calculateGeneticEffect(cohortData = modCohortData,
                                               BECkey = cceArgs$BECkey,
                                               pixelGroupMap = pixelGroupMap,
@@ -323,7 +328,9 @@ gamlss.own <- function(x, y, w, xeval = NULL, ...)
 #' @export
 calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTable, currentBEC, ecoregionMap){
 
- #1. get BEC zones of each ecoregionGroup
+  transferTable <- copy(transferTable) #this is necessary due to column name changes
+  BECkey <- copy(BECkey) #this is necessary due to class change
+  #1. get BEC zones of each ecoregionGroup
   ecoregionKey <- as.data.table(ecoregionMap@data@attributes[[1]])
   setnames(ecoregionKey, 'ID', 'ecoregionMapCode') #Change ID, because ID in BECkey = ecoregion, not mapcode
   BECkey[, ID := as.factor(as.character(ID))]
@@ -385,10 +392,11 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
     cohortData[is.na(Provenance), Provenance := zsv]
   }
   cohortData[, zsv := NULL]
+
   setnames(transferTable, old = c("BECvarfut_plantation", 'BECvar_seed'), new = c("currentClimate", "Provenance"))
   cohortData <- transferTable[cohortData, on = c('currentClimate' = 'currentClimate',
                                                   'Provenance' = 'Provenance',
                                                   'speciesCode' = 'speciesCode')] %>%
-    .[, .(pixelGroup, ecoregionGroup, speciesCode, age, Provenance, HTp_pred)]
+    .[, .(pixelGroup, speciesCode, age, Provenance, HTp_pred)]
   return(cohortData)
 }
