@@ -142,6 +142,9 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
 
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
 
+  #Because the params are numeric (e.g 66.667, the comparison forces the int to numeric)
+  climateEffect[, c('growthPred', 'mortPred') := .(asInteger(growthPred), asInteger(mortPred)]
+
   return(climateEffect)
 }
 
@@ -366,11 +369,16 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
   ties <- projBEC[pixelGroup %in% counts[N > 1]$pixelGroup]
   rm(counts)
   #randomly order, then remove duplicates
+  if (nrow(ties) > 1) {
   ties$foo <- sample(x = 1:nrow(ties), size = nrow(ties))
   setkey(ties, foo)
   ties <- ties[!duplicated(ties[, .(pixelGroup)])]
   ties[, foo := NULL]
   assignedBEC <- rbind(ties, noTies)
+  } else {
+    assignedBEC <- noTies
+  }
+
   if (nrow(assignedBEC) != length(unique(projBEC$pixelGroup))) {
     stop("Error: mismatch in pixelGroups and projected BECs, debug LandR.CS")
   }
@@ -394,6 +402,7 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
   cohortData[, zsv := NULL]
 
   setnames(transferTable, old = c("BECvarfut_plantation", 'BECvar_seed'), new = c("currentClimate", "Provenance"))
+
   cohortData <- transferTable[cohortData, on = c('currentClimate' = 'currentClimate',
                                                   'Provenance' = 'Provenance',
                                                   'speciesCode' = 'speciesCode')] %>%
