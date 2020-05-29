@@ -143,7 +143,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
 
   #Because the params are numeric (e.g 66.667, the comparison forces the int to numeric)
-  climateEffect[, c('growthPred', 'mortPred') := .(asInteger(growthPred), asInteger(mortPred)]
+  climateEffect[, c('growthPred', 'mortPred') := .(asInteger(growthPred), asInteger(mortPred))]
 
   return(climateEffect)
 }
