@@ -408,11 +408,6 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
                                                   'speciesCode' = 'speciesCode')] %>%
     .[, .(pixelGroup, speciesCode, age, Provenance, HTp_pred)]
 
-  if (any(is.na(cohortData$Provenance))) {
-    browser()
-    #what the hell happened?
-  }
-
   if (nrow(cohortData) != bugCatch) {
     stop("unequal row count after calculate genetic effect. debug LandR.CS")
   }
