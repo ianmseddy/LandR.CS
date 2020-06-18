@@ -143,7 +143,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
 
   #Because the params are numeric (e.g 66.667, the comparison forces the int to numeric)
-  climateEffect[, c('growthPred', 'mortPred') := .(asInteger(growthPred), asInteger(mortPred)]
+  climateEffect[, c('growthPred', 'mortPred') := .(asInteger(growthPred), asInteger(mortPred))]
 
   return(climateEffect)
 }
@@ -342,16 +342,17 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
   ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
 
 #2. Find Provenance of cohortData
+  bugCatch <- nrow(cohortData)
   if (is.null(cohortData$Provenance)){
-    cohortDataSmall <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup)] %>%
+    cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age)] %>%
       ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
-    setnames(cohortDataSmall, 'zsv', 'Provenance')
+    setnames(cohortData, 'zsv', 'Provenance')
   } else {
-     cohortDataSmall <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, Provenance)] %>%
+    cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age, Provenance)] %>%
       ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
-    setnames(cohortDataSmall, 'zsv', 'assumedProvenance')
-    cohortDataSmall[is.na(Provenance), Provenance := assumedProvenance]
-    cohortDataSmall[, assumedProvenance := NULL] #Confirm this doesn't erase parts of Provenance by reference
+    setnames(cohortData, 'zsv', 'assumedProvenance')
+    cohortData[is.na(Provenance), Provenance := assumedProvenance]
+    cohortData[, assumedProvenance := NULL] #Confirm this doesn't erase parts of Provenance by reference
   }
 
 #3. Assign the mode among projected BECs for each pixelGroup
@@ -385,15 +386,14 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
   rm(ties, noTies, projBEC)
 
 #4.Join tables
-
   assignedBEC <- BECkey[assignedBEC, on = c("ID" = 'BEC')] %>%
     .[, .(pixelGroup, zsv)]
   setnames(assignedBEC, old = 'zsv', new = 'currentClimate')
   cohortData <- assignedBEC[cohortData, on = c('pixelGroup' = 'pixelGroup')]
 
 #5.Add Provenance if missing
+  #I think this is redundant
   cohortData <- ecoregionKeySmall[cohortData, on = c("ecoregionGroup" = 'ecoregionGroup')]
-
   if (is.null(cohortData$Provenance)) {
     cohortData[, Provenance := zsv]
   } else {
@@ -407,5 +407,14 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
                                                   'Provenance' = 'Provenance',
                                                   'speciesCode' = 'speciesCode')] %>%
     .[, .(pixelGroup, speciesCode, age, Provenance, HTp_pred)]
+
+  if (any(is.na(cohortData$Provenance))) {
+    browser()
+    #what the hell happened?
+  }
+
+  if (nrow(cohortData) != bugCatch) {
+    stop("unequal row count after calculate genetic effect. debug LandR.CS")
+  }
   return(cohortData)
 }
