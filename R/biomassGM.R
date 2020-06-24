@@ -90,10 +90,6 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                           predict(object = mcsModel, parameter = 'mu', newdata = refClim,
                                   level = 0, asList = TRUE, type = "response") * 100)
 
-  mortPred[mortPred < min(gmcsMortLimits)] <- min(gmcsMortLimits)
-  mortPred[mortPred > max(gmcsMortLimits)] <- max(gmcsMortLimits)
-
-
   if (anyNA(c(mortPred, growthPred))) {
     stop("error in climate prediction. NA value returned - this will break LANDR downstream")
   }
@@ -330,7 +326,7 @@ gamlss.own <- function(x, y, w, xeval = NULL, ...)
 #' @rdname calculateGeneticEffect
 #' @export
 calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTable, currentBEC, ecoregionMap){
-
+  message("calculating genetic effect")
   transferTable <- copy(transferTable) #this is necessary due to column name changes
   BECkey <- copy(BECkey) #this is necessary due to class change
   #1. get BEC zones of each ecoregionGroup
@@ -341,19 +337,19 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
   ecoregionKey <- BECkey[ecoregionKey, on = c("ID" = 'ecoregion')] #now we have zsv of cohortData$ecoregionGroup
   ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
 
-#2. Find Provenance of cohortData
-  bugCatch <- nrow(cohortData)
-  if (is.null(cohortData$Provenance)){
-    cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age)] %>%
-      ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
-    setnames(cohortData, 'zsv', 'Provenance')
-  } else {
-    cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age, Provenance)] %>%
-      ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
-    setnames(cohortData, 'zsv', 'assumedProvenance')
-    cohortData[is.na(Provenance), Provenance := assumedProvenance]
-    cohortData[, assumedProvenance := NULL] #Confirm this doesn't erase parts of Provenance by reference
-  }
+#2. Find Provenance of cohortData - moved this to an event in assistedMigrationBC module
+  # bugCatch <- nrow(cohortData)
+  # if (is.null(cohortData$Provenance)){
+  #   cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age)] %>%
+  #     ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
+  #   setnames(cohortData, 'zsv', 'Provenance')
+  # } else {
+  #   cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age, Provenance)] %>%
+  #     ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
+  #   setnames(cohortData, 'zsv', 'assumedProvenance')
+  #   cohortData[is.na(Provenance), Provenance := assumedProvenance]
+  #   cohortData[, assumedProvenance := NULL] #Confirm this doesn't erase parts of Provenance by reference
+  # }
 
 #3. Assign the mode among projected BECs for each pixelGroup
   projBEC <- data.table(pixelGroup = getValues(pixelGroupMap), BEC = getValues(currentBEC)) %>%
@@ -394,11 +390,6 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
 #5.Add Provenance if missing
   #I think this is redundant
   cohortData <- ecoregionKeySmall[cohortData, on = c("ecoregionGroup" = 'ecoregionGroup')]
-  if (is.null(cohortData$Provenance)) {
-    cohortData[, Provenance := zsv]
-  } else {
-    cohortData[is.na(Provenance), Provenance := zsv]
-  }
   cohortData[, zsv := NULL]
 
   setnames(transferTable, old = c("BECvarfut_plantation", 'BECvar_seed'), new = c("currentClimate", "Provenance"))
