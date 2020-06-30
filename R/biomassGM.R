@@ -8,15 +8,16 @@
 #' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
 #' @param gmcsMortLimits lower and upper limits to the effect of climate on mortality
 #' @param gmcsMinAge mininmum age for which to predict growth/mortality
+#' @param cohortDefinitionCols cohortData columns that determine individual cohorts
 #' @importFrom data.table setkey data.table
 #' @importFrom stats median
 #' @importFrom raster getValues projection
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
-                                   gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge){
+                                   gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge, cohortDefinitionCols){
   cohortData <- copy(cohortData)
-  neededCols <- c("pixelGroup", 'speciesCode', 'age', 'B') %>%
+  neededCols <- c(cohortDefinitionCols, 'B') %>%
     .[. %in% colnames(cohortData)]
   climCohortData <- cohortData[, ..neededCols]
 
@@ -46,7 +47,8 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                              "ATA" = ATAvals,
                              'CMInormal' = CMInormalvals)
 
-  climateMatch <- climateMatch[!is.na(pixelGroup)] #Not all pixelGroups are in pixelGroupMap, because climCohortData is a subset
+  climateMatch <- climateMatch[!is.na(pixelGroup)]
+  #Not all pixelGroups are in pixelGroupMap, because climCohortData is a subset
   #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
   climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
                                  "ATA" = median(ATA, na.rm = TRUE),
@@ -67,6 +69,15 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   pixelGroupsPostSubset <- predData$pixelGroup
   agePostSubset <- predData$age
   speciesCodePostSubset <- predData$speciesCode
+
+  modCohortDef <- FALSE
+
+  #necessary for joining if cohortData has added columns
+  if (length(cohortDefinitionCols[!cohortDefinitionCols %in% c('age', 'pixelGroup', 'speciesCode')]) > 0) {
+    modCohortDef <- TRUE
+    addedColumns <-  cohortDefinitionCols[!cohortDefinitionCols %in% c('age', 'pixelGroup', 'speciesCode')]
+    addedColumns <- predData[, ..addedColumns]
+  }
 
   predData <- predData[, .(logAge, ATA, CMI, CMInormal)]
 
@@ -94,22 +105,22 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
     stop("error in climate prediction. NA value returned - this will break LANDR downstream")
   }
 
+  #predict requires exact asme columns in data.frame at the moment, hence this clumsy rebuilding
   climateEffect <- data.table("pixelGroup" = pixelGroupsPostSubset,
                               'speciesCode' = speciesCodePostSubset,
                               "age" = agePostSubset,
                               "growthPred" = growthPred,
                               "mortPred" = mortPred)
+  if (modCohortDef) {
+    climateEffect <- cbind(climateEffect, addedColumns)
+  }
 
   if (length(cceArgs) > 5) {
 
     if (!any(is.null(cceArgs$transferTable), is.null(cceArgs$BECkey),
              is.null(cceArgs$currentBEC), is.null(cceArgs$ecoregionMap))) {
       #we do not want all the columns in cohortData, but we need ecoregionGroup and Provenance if present
-      if (is.null(cohortData$Provenance)) {
-        modCohortData <- cohortData[, .(pixelGroup, speciesCode, age, ecoregionGroup)]
-      } else {
       modCohortData <- cohortData[, .(pixelGroup, speciesCode, age, ecoregionGroup, Provenance)]
-      }
 
       geneticEffect <- calculateGeneticEffect(cohortData = modCohortData,
                                               BECkey = cceArgs$BECkey,
@@ -118,8 +129,8 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                               ecoregionMap = cceArgs$ecoregionMap,
                                               currentBEC = cceArgs$currentBEC)
 
-      setkey(climateEffect, pixelGroup, speciesCode, age)
-      setkey(geneticEffect, pixelGroup, speciesCode, age)
+      setkeyv(climateEffect, cohortDefinitionCols)
+      setkeyv(geneticEffect, cohortDefinitionCols)
       climateEffect <- geneticEffect[climateEffect]
       climateEffect[, growthPred := asInteger(HTp_pred * growthPred)]
       climateEffect[, HTp_pred := NULL] #get rid of this column
@@ -338,7 +349,7 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
   ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
 
 #2. Find Provenance of cohortData - moved this to an event in assistedMigrationBC module
-  # bugCatch <- nrow(cohortData)
+  bugCatch <- nrow(cohortData)
   # if (is.null(cohortData$Provenance)){
   #   cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age)] %>%
   #     ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
@@ -360,7 +371,7 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
   projBEC <- projBEC[N == modeBEC] %>%
     .[, c('modeBEC', 'N') := NULL]
 
-  #Find ties
+  #Find ties in mode
   counts <- projBEC[, .N, .(pixelGroup)]
   noTies <- projBEC[pixelGroup %in% counts[N == 1]$pixelGroup]
   ties <- projBEC[pixelGroup %in% counts[N > 1]$pixelGroup]
@@ -387,8 +398,6 @@ calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTa
   setnames(assignedBEC, old = 'zsv', new = 'currentClimate')
   cohortData <- assignedBEC[cohortData, on = c('pixelGroup' = 'pixelGroup')]
 
-#5.Add Provenance if missing
-  #I think this is redundant
   cohortData <- ecoregionKeySmall[cohortData, on = c("ecoregionGroup" = 'ecoregionGroup')]
   cohortData[, zsv := NULL]
 
