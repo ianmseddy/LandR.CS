@@ -143,10 +143,11 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   #restrict predictions to those above min stand age
   climateEffect[age < gmcsMinAge, mortPred := 100]
   climateEffect[age < gmcsMinAge, growthPred := 100]
-
-  climateEffect <- climateEffect[cohortData[, .(pixelGroup, speciesCode, age)], on = c('pixelGroup', 'speciesCode', 'age')]
+  temp <- cohortData[, ..cohortDefinitionCols]
+  climateEffect <- climateEffect[temp, on = cohortDefinitionCols]
+  rm(temp)
   #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
-
+  #which should be quite rare but persist with postProcess problems
   climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
 
   #Because the params are numeric (e.g 66.667, the comparison forces the int to numeric)
