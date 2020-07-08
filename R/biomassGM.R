@@ -100,6 +100,9 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                 newdata = predData, level = 0, asList = TRUE, type = "response")/
                           predict(object = mcsModel, parameter = 'mu', newdata = refClim,
                                   level = 0, asList = TRUE, type = "response") * 100)
+  mortPred[mortPred < min(gmcsMortLimits)] <- min(gmcsMortLimits)
+  mortPred[mortPred > max(gmcsMortLimits)] <- max(gmcsMortLimits)
+
 
   if (anyNA(c(mortPred, growthPred))) {
     stop("error in climate prediction. NA value returned - this will break LANDR downstream")
