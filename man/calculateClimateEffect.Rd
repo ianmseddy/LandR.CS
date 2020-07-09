@@ -10,7 +10,8 @@ calculateClimateEffect(
   cceArgs,
   gmcsGrowthLimits,
   gmcsMortLimits,
-  gmcsMinAge
+  gmcsMinAge,
+  cohortDefinitionCols
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ calculateClimateEffect(
 \item{gmcsMortLimits}{lower and upper limits to the effect of climate on mortality}
 
 \item{gmcsMinAge}{mininmum age for which to predict growth/mortality}
+
+\item{cohortDefinitionCols}{cohortData columns that determine individual cohorts}
 }
 \description{
 Predict biomass change with climate variables
