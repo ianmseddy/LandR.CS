@@ -15,7 +15,8 @@
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
-                                   gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge, cohortDefinitionCols){
+                                   gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge,
+                                   cohortDefinitionCols = c("age", 'speciesCode', 'pixelGroup')){
   cohortData <- copy(cohortData)
   neededCols <- c(cohortDefinitionCols, 'B') %>%
     .[. %in% colnames(cohortData)]

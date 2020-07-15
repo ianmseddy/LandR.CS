@@ -11,7 +11,7 @@ calculateClimateEffect(
   gmcsGrowthLimits,
   gmcsMortLimits,
   gmcsMinAge,
-  cohortDefinitionCols
+  cohortDefinitionCols = c("age", "speciesCode", "pixelGroup")
 )
 }
 \arguments{
