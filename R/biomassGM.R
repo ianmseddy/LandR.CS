@@ -133,8 +133,9 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                               ecoregionMap = cceArgs$ecoregionMap,
                                               currentBEC = cceArgs$currentBEC)
 
-      setkeyv(climateEffect, cohortDefinitionCols)
-      setkeyv(geneticEffect, cohortDefinitionCols)
+      #this may be an issue if some cohorts are distinguished by a column in cohortDefinitionCols that is subset out
+      setkeyv(climateEffect, colnames(climateEffect)[colnames(climateEffect) %in% cohortDefinitionCols])
+      setkeyv(geneticEffect, colnames(geneticEffect)[colnames(geneticEffect) %in% cohortDefinitionCols])
       climateEffect <- geneticEffect[climateEffect]
       climateEffect[, growthPred := asInteger(HTp_pred * growthPred)]
       climateEffect[, HTp_pred := NULL] #get rid of this column
