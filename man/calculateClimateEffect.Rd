@@ -25,7 +25,8 @@ calculateClimateEffect(
 
 \item{gmcsMortLimits}{lower and upper limits to the effect of climate on mortality}
 
-\item{gmcsMinAge}{mininmum age for which to predict growth/mortality}
+\item{gmcsMinAge}{minimum age for which to predict full effect of growth/mortality -
+younger ages are weighted toward a null effect with decreasing age}
 
 \item{cohortDefinitionCols}{cohortData columns that determine individual cohorts}
 }

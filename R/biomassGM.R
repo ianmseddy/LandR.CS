@@ -7,7 +7,8 @@
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
 #' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
 #' @param gmcsMortLimits lower and upper limits to the effect of climate on mortality
-#' @param gmcsMinAge mininmum age for which to predict growth/mortality
+#' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
+#' younger ages are weighted toward a null effect with decreasing age
 #' @param cohortDefinitionCols cohortData columns that determine individual cohorts
 #' @importFrom data.table setkey data.table
 #' @importFrom stats median
@@ -146,8 +147,8 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   }
 
   #restrict predictions to those above min stand age
-  climateEffect[age < gmcsMinAge, mortPred := 100]
-  climateEffect[age < gmcsMinAge, growthPred := 100]
+  climateEffect[age < gmcsMinAge, growthPred := 100 + ((growthPred - 100) * (age/gmcsMinAge)^2)]
+  climateEffect[age < gmcsMinAge, mortPred := 100 + ((mortPred - 100) * (age/gmcsMinAge)^2)]
   temp <- cohortData[, ..cohortDefinitionCols]
   climateEffect <- climateEffect[temp, on = cohortDefinitionCols]
   rm(temp)
