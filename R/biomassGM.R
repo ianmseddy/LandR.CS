@@ -139,7 +139,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
       setkeyv(geneticEffect, colnames(geneticEffect)[colnames(geneticEffect) %in% cohortDefinitionCols])
       climateEffect <- geneticEffect[climateEffect]
       climateEffect[, growthPred := asInteger(HTp_pred * growthPred)]
-      climateEffect[, HTp_pred := NULL] #get rid of this column
+      # climateEffect[, HTp_pred := NULL] #get rid of this column
 
     } else {
       stop("cceArgs does not match methods available in LandR.CS")
