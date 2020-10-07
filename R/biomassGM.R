@@ -147,8 +147,8 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   }
 
   #restrict predictions to those above min stand age
-  climateEffect[age < gmcsMinAge, growthPred := as.intger(100 + ((growthPred - 100) * (age/gmcsMinAge)^2))]
-  climateEffect[age < gmcsMinAge, mortPred := as.integer(100 + ((mortPred - 100) * (age/gmcsMinAge)^2))]
+  climateEffect[age < gmcsMinAge, growthPred := as.integer(100 + ((growthPred - 100) * (age/gmcsMinAge)))]
+  climateEffect[age < gmcsMinAge, mortPred := as.integer(100 + ((mortPred - 100) * (age/gmcsMinAge)))]
   temp <- cohortData[, ..cohortDefinitionCols]
   climateEffect <- climateEffect[temp, on = cohortDefinitionCols]
   rm(temp)
