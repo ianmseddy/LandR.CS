@@ -107,7 +107,9 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
 
 
   if (anyNA(c(mortPred, growthPred))) {
-    stop("error in climate prediction. NA value returned - this will break LANDR downstream")
+    mortPred[is.na(mortPred)] <- max(gmcsMortLimits)
+    growthPred[is.na(growthPred)] <- max(gmcsGrowthLimits)
+    warning("NA in climate prediction. Likely integer overflow - setting to gmcsLimits")
   }
 
   #predict requires exact asme columns in data.frame at the moment, hence this clumsy rebuilding
