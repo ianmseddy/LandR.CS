@@ -122,32 +122,6 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
     climateEffect <- cbind(climateEffect, addedColumns)
   }
 
-  if (length(cceArgs) > 5) {
-
-    if (!any(is.null(cceArgs$transferTable), is.null(cceArgs$BECkey),
-             is.null(cceArgs$currentBEC), is.null(cceArgs$ecoregionMap))) {
-      #we do not want all the columns in cohortData, but we need ecoregionGroup and Provenance if present
-      modCohortData <- cohortData[, .(pixelGroup, speciesCode, age, ecoregionGroup, Provenance)]
-
-      geneticEffect <- calculateGeneticEffect(cohortData = modCohortData,
-                                              BECkey = cceArgs$BECkey,
-                                              pixelGroupMap = pixelGroupMap,
-                                              transferTable = cceArgs$transferTable,
-                                              ecoregionMap = cceArgs$ecoregionMap,
-                                              currentBEC = cceArgs$currentBEC)
-
-      #this may be an issue if some cohorts are distinguished by a column in cohortDefinitionCols that is subset out
-      setkeyv(climateEffect, colnames(climateEffect)[colnames(climateEffect) %in% cohortDefinitionCols])
-      setkeyv(geneticEffect, colnames(geneticEffect)[colnames(geneticEffect) %in% cohortDefinitionCols])
-      climateEffect <- geneticEffect[climateEffect]
-      climateEffect[, growthPred := asInteger(HTp_pred * growthPred)]
-      # climateEffect[, HTp_pred := NULL] #get rid of this column
-
-    } else {
-      stop("cceArgs does not match methods available in LandR.CS")
-    }
-  }
-
   #restrict predictions to those above min stand age
   climateEffect[age < gmcsMinAge, growthPred := as.integer(100 + ((growthPred - 100) * (age/gmcsMinAge)))]
   climateEffect[age < gmcsMinAge, mortPred := as.integer(100 + ((mortPred - 100) * (age/gmcsMinAge)))]
@@ -170,7 +144,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
 #' @param fixed the fixed terms
 #' @param random the random terms
 #' @param correlation this is the correlation structure?
-#' @param method Ceres help me
+#' @param method TODO: Description needed
 #' @param level the marginal or conditional predictor
 #' @importFrom nlme lmeControl
 #' @importFrom reproducible .grepSysCalls
@@ -327,88 +301,4 @@ gamlss.own <- function(x, y, w, xeval = NULL, ...)
     else
       predict(fit, newdata = OData[seq(length(y) + 1, ll), ], level = level)
   }
-}
-
-
-#'  calculateGeneticEffect
-#'
-#'  Predict climate induced height reduction due to genetics
-#'
-#' @param BECkey a key that matches BECraster code with transfer table
-#' @param cohortData The LandR cohortData object
-#' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
-#' @param transferTable a table with genetic performance of species in each variant
-#' @param currentBEC the current projected BEC zone
-#' @param ecoregionMap a raster an RAT that matches ecoregionGroup to ecoregion
-#' @importFrom data.table setkey data.table
-#' @importFrom stats median
-#' @importFrom raster getValues projection
-#' @rdname calculateGeneticEffect
-#' @export
-calculateGeneticEffect <- function(BECkey, cohortData, pixelGroupMap, transferTable, currentBEC, ecoregionMap){
-
-  transferTable <- copy(transferTable) #this is necessary due to column name changes
-  BECkey <- copy(BECkey) #this is necessary due to class change
-  #1. get BEC zones of each ecoregionGroup
-  ecoregionKey <- as.data.table(ecoregionMap@data@attributes[[1]])
-  setnames(ecoregionKey, 'ID', 'ecoregionMapCode') #Change ID, because ID in BECkey = ecoregion, not mapcode
-  BECkey[, ID := as.factor(as.character(ID))]
-
-  ecoregionKey <- BECkey[ecoregionKey, on = c("ID" = 'ecoregion')] #now we have zsv of cohortData$ecoregionGroup
-  ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
-
-#2. Find Provenance of cohortData
-  bugCatch <- nrow(cohortData) #moved this chunk of code to the AM module
-
-
-#3. Assign the mode among projected BECs for each pixelGroup
-  projBEC <- data.table(pixelGroup = getValues(pixelGroupMap), BEC = getValues(currentBEC)) %>%
-    na.omit(.) %>%
-    .[, BEC := as.factor(BEC)]
-  projBEC <- projBEC[, .N, .(pixelGroup, BEC)]
-  projBEC[, modeBEC := max(N), .(pixelGroup)]
-  projBEC <- projBEC[N == modeBEC] %>%
-    .[, c('modeBEC', 'N') := NULL]
-
-  #Find ties in mode
-  counts <- projBEC[, .N, .(pixelGroup)]
-  noTies <- projBEC[pixelGroup %in% counts[N == 1]$pixelGroup]
-  ties <- projBEC[pixelGroup %in% counts[N > 1]$pixelGroup]
-  rm(counts)
-  #randomly order, then remove duplicates
-  if (nrow(ties) > 1) {
-  ties$foo <- sample(x = 1:nrow(ties), size = nrow(ties))
-  setkey(ties, foo)
-  ties <- ties[!duplicated(ties[, .(pixelGroup)])]
-  ties[, foo := NULL]
-  assignedBEC <- rbind(ties, noTies)
-  } else {
-    assignedBEC <- noTies
-  }
-
-  if (nrow(assignedBEC) != length(unique(projBEC$pixelGroup))) {
-    stop("Error: mismatch in pixelGroups and projected BECs, debug LandR.CS")
-  }
-  rm(ties, noTies, projBEC)
-
-#4.Join tables
-  assignedBEC <- BECkey[assignedBEC, on = c("ID" = 'BEC')] %>%
-    .[, .(pixelGroup, zsv)]
-  setnames(assignedBEC, old = 'zsv', new = 'currentClimate')
-  cohortData <- assignedBEC[cohortData, on = c('pixelGroup' = 'pixelGroup')]
-
-  cohortData <- ecoregionKeySmall[cohortData, on = c("ecoregionGroup" = 'ecoregionGroup')]
-  cohortData[, zsv := NULL]
-
-  setnames(transferTable, old = c("BECvarfut_plantation", 'BECvar_seed'), new = c("currentClimate", "Provenance"))
-
-  cohortData <- transferTable[cohortData, on = c('currentClimate' = 'currentClimate',
-                                                  'Provenance' = 'Provenance',
-                                                  'speciesCode' = 'speciesCode')] %>%
-    .[, .(pixelGroup, speciesCode, age, Provenance, HTp_pred)]
-
-  if (nrow(cohortData) != bugCatch) {
-    stop("unequal row count after calculate genetic effect. debug LandR.CS")
-  }
-  return(cohortData)
 }

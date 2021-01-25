@@ -21,7 +21,7 @@ own(
 
 \item{correlation}{this is the correlation structure?}
 
-\item{method}{Ceres help me}
+\item{method}{TODO: Description needed}
 
 \item{level}{the marginal or conditional predictor}
 }
