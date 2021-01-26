@@ -5,7 +5,7 @@
 \title{gamlss.own
 the definition of the backfitting additive function, Authors: Mikis Stasinopoulos, Marco Enea}
 \usage{
-gamlss.own(x, y, w, xeval = NULL, ...)
+gamlss.own(x, y, w, xeval = NULL)
 }
 \arguments{
 \item{x}{description missing}
@@ -13,6 +13,8 @@ gamlss.own(x, y, w, xeval = NULL, ...)
 \item{y}{description missing}
 
 \item{w}{description missing}
+
+\item{xeval}{description missing}
 }
 \description{
 gamlss.own

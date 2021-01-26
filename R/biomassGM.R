@@ -1,3 +1,8 @@
+globalVariables(c(
+  ".", "age", "logAge", "pixelGroup", "..cohortDefinitionCols", "..addedColumns", "..neededCols", ":="
+))
+
+
 #'  CalculateClimateEffect
 #'
 #'  Predict biomass change with climate variables
@@ -10,17 +15,18 @@
 #' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
 #' younger ages are weighted toward a null effect with decreasing age
 #' @param cohortDefinitionCols cohortData columns that determine individual cohorts
-#' @importFrom data.table setkey data.table
-#' @importFrom stats median
-#' @importFrom raster getValues projection
+#' @importFrom data.table setkey data.table copy
+#' @importFrom LandR asInteger
+#' @importFrom raster getValues projection ncell
+#' @importFrom stats na.omit predict median
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge,
                                    cohortDefinitionCols = c("age", 'speciesCode', 'pixelGroup')){
   cohortData <- copy(cohortData)
-  neededCols <- c(cohortDefinitionCols, 'B') %>%
-    .[. %in% colnames(cohortData)]
+  neededCols <- c(cohortDefinitionCols, 'B')
+  neededCols <- neededCols[neededCols %in% colnames(cohortData)]
   climCohortData <- cohortData[, ..neededCols]
 
   #extract relevant args
@@ -146,8 +152,12 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
 #' @param correlation this is the correlation structure?
 #' @param method TODO: Description needed
 #' @param level the marginal or conditional predictor
+#' @param ... additional arguments passed to lmeCcontrol
 #' @importFrom nlme lmeControl
+#' @importFrom utils tail
+#' @importFrom stats as.formula fitted formula model.frame predict
 #' @importFrom reproducible .grepSysCalls
+
 #' @rdname own
 #' @export
 own <-function(fixed=~1, random = NULL, correlation = NULL, method = "ML",
@@ -229,10 +239,12 @@ own <-function(fixed=~1, random = NULL, correlation = NULL, method = "ML",
 #' @param x description missing
 #' @param y description missing
 #' @param w description missing
-#' @importFrom nlme lme
+#' @param xeval description missing
+#' @importFrom nlme lme varFixed
+#' @importFrom stats as.formula fitted formula model.frame predict
 #' @rdname gamlss.own
 #' @export
-gamlss.own <- function(x, y, w, xeval = NULL, ...)
+gamlss.own <- function(x, y, w, xeval = NULL)
 {
   fixed <- attr(x, "fixed")
   random <- attr(x, "random")

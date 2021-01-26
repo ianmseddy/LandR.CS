@@ -24,6 +24,8 @@ own(
 \item{method}{TODO: Description needed}
 
 \item{level}{the marginal or conditional predictor}
+
+\item{...}{additional arguments passed to lmeCcontrol}
 }
 \description{
 own
