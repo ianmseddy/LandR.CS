@@ -4,7 +4,7 @@ Version: 0.0.2.0002
 Authors@R:
     c(person(given = "Ian",
              family = "Eddy",
-             role = "ctb",
+             role = c("aut", "cre"),
              email = "ian.eddy@canada.com",
              comment = c(ORCID = "0000-0001-7397-2116")),
       person(given = "Her Majesty the Queen in Right of Canada, as represented by the Minister of Natural Resources Canada",
