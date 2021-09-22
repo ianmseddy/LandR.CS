@@ -1,6 +1,6 @@
 Package: LandR.CS
 Title: Climate-sensitive Growth and Mortality in LandR 
-Version: 0.0.3
+Version: 0.0.3.9000
 Authors@R: c(
     person("Ian", "Eddy", email = "ian.eddy@canada.com",
            role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7397-2116")),
