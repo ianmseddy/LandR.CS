@@ -26,7 +26,6 @@ Imports:
     stats
 Encoding: UTF-8
 Language: en-CA
-LazyData: true
 License:  GPL-3
 RoxygenNote: 7.1.1
 BugReports:
