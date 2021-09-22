@@ -1,20 +1,20 @@
 Package: LandR.CS
 Title: Climate-sensitive Growth and Mortality in LandR 
-Version: 0.0.2.0002
-Authors@R:
-    c(person(given = "Ian",
-             family = "Eddy",
-             role = "ctb",
-             email = "ian.eddy@canada.com",
-             comment = c(ORCID = "0000-0001-7397-2116")),
-      person(given = "Her Majesty the Queen in Right of Canada, as represented by the Minister of Natural Resources Canada",
-             role = "cph"))
+Version: 0.0.3
+Authors@R: c(
+    person("Ian", "Eddy", email = "ian.eddy@canada.com",
+           role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7397-2116")),
+    person("Alex M", "Chubaty", email = "achubaty@for-cast.ca",
+           role = c("ctb"), comment = c(ORCID = "0000-0001-7146-8135")),
+    person(given = paste("Her Majesty the Queen in Right of Canada,",
+           "as represented by the Minister of Natural Resources Canada"), role = "cph")
+    )
 Description: This package contains climate-sensitive growth and mortality function for LandR.
     Some flexibility exists in how climate-sensitivity is derived, however the simplest
     and most robust method is to use the SpaDES modules 'PSPclean' and 'gmcsDataPrep'.
 URL: 
     https://github.com/ianmseddy/LandR.CS
-Depends: R (>= 3.5)
+Depends: R (>= 3.6)
 License:  GPL-3
 Encoding: UTF-8
 LazyData: true
