@@ -24,7 +24,7 @@ globalVariables(c(
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge,
                                    cohortDefinitionCols = c("age", 'speciesCode', 'pixelGroup')){
-  cohortData <- copy(cohortData)
+  cohortData <- data.table::copy(cohortData)
   neededCols <- c(cohortDefinitionCols, 'B')
   neededCols <- neededCols[neededCols %in% colnames(cohortData)]
   climCohortData <- cohortData[, ..neededCols]
