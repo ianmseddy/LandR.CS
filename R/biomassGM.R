@@ -15,7 +15,8 @@ globalVariables(c(
 #' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
 #' younger ages are weighted toward a null effect with decreasing age
 #' @param cohortDefinitionCols cohortData columns that determine individual cohorts
-#' @importFrom data.table setkey data.table copy
+#' @importFrom data.table setkey data.table
+#' @importFrom reproducible Copy
 #' @importFrom LandR asInteger
 #' @importFrom raster getValues projection ncell
 #' @importFrom stats na.omit predict median
@@ -24,7 +25,7 @@ globalVariables(c(
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge,
                                    cohortDefinitionCols = c("age", 'speciesCode', 'pixelGroup')){
-  cohortData <- data.table::copy(cohortData)
+  cohortData <- Copy(cohortData)
   neededCols <- c(cohortDefinitionCols, 'B')
   neededCols <- neededCols[neededCols %in% colnames(cohortData)]
   climCohortData <- cohortData[, ..neededCols]
