@@ -2,8 +2,7 @@
 % Please edit documentation in R/biomassGM.R
 \name{own}
 \alias{own}
-\title{own
- for predicting from gamlss with no random effect}
+\title{own}
 \usage{
 own(
   fixed = ~1,
@@ -28,6 +27,5 @@ own(
 \item{...}{additional arguments passed to lmeCcontrol}
 }
 \description{
-own
- for predicting from gamlss with no random effect
+for predicting from gamlss with no random effect
 }

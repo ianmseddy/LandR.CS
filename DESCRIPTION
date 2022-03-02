@@ -2,7 +2,7 @@ Package: LandR.CS
 Title: Climate-sensitive Growth and Mortality in LandR 
 Description: This package contains climate-sensitive growth and mortality function for LandR.
     Some flexibility exists in how climate-sensitivity is derived, however the simplest
-    and most robust method is to use the SpaDES modules 'PSPclean' and 'gmcsDataPrep'.
+    and most robust method is to use the SpaDES module 'gmcsDataPrep' and R package 'PSPclean'.
 URL: 
     https://github.com/ianmseddy/LandR.CS
 Version: 0.0.3.9000
@@ -26,7 +26,7 @@ Imports:
     stats
 Encoding: UTF-8
 Language: en-CA
-License:  GPL-3
-RoxygenNote: 7.1.1
+License: GPL-3
 BugReports:
     https://github.com/ianmseddy/LandR.CS/issues
+RoxygenNote: 7.1.2

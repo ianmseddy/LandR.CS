@@ -2,8 +2,7 @@
 % Please edit documentation in R/biomassGM.R
 \name{gamlss.own}
 \alias{gamlss.own}
-\title{gamlss.own
-the definition of the backfitting additive function, Authors: Mikis Stasinopoulos, Marco Enea}
+\title{gamlss.own}
 \usage{
 gamlss.own(x, y, w, xeval = NULL)
 }
@@ -17,6 +16,8 @@ gamlss.own(x, y, w, xeval = NULL)
 \item{xeval}{description missing}
 }
 \description{
-gamlss.own
-the definition of the backfitting additive function, Authors: Mikis Stasinopoulos, Marco Enea
+the definition of the backfitting additive function
+}
+\author{
+Mikis Stasinopoulos and Marco Enea
 }
