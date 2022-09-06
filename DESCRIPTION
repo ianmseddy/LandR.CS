@@ -24,6 +24,8 @@ Imports:
     raster,
     reproducible,
     stats
+Remotes:
+    PredictiveEcology/LandR@development
 Encoding: UTF-8
 Language: en-CA
 License: GPL-3
