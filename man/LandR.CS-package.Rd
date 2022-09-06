@@ -23,7 +23,21 @@ These functions incorporate climate sensitivity into LandR processes.
 }
 }
 
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/ianmseddy/LandR.CS}
+  \item Report bugs at \url{https://github.com/ianmseddy/LandR.CS/issues}
+}
+
+}
 \author{
-\strong{Maintainer}: Ian Eddy \email{ian.eddy@canada.ca}
+\strong{Maintainer}: Ian Eddy \email{ian.eddy@canada.com} (\href{https://orcid.org/0000-0001-7397-2116}{ORCID})
+
+Other contributors:
+\itemize{
+  \item Alex M Chubaty \email{achubaty@for-cast.ca} (\href{https://orcid.org/0000-0001-7146-8135}{ORCID}) [contributor]
+  \item Her Majesty the Queen in Right of Canada, as represented by the Minister of Natural Resources Canada [copyright holder]
+}
 
 }

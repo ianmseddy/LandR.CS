@@ -2,7 +2,7 @@
 % Please edit documentation in R/biomassGM.R
 \name{calculateClimateEffect}
 \alias{calculateClimateEffect}
-\title{CalculateClimateEffect}
+\title{Calculate climate effect}
 \usage{
 calculateClimateEffect(
   cohortData,
