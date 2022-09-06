@@ -27,5 +27,7 @@ Imports:
     raster,
     reproducible,
     stats
+Remotes:
+    PredictiveEcology/LandR@development
 BugReports:
     https://github.com/ianmseddy/LandR.CS/issues
