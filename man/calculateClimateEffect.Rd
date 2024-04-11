@@ -8,6 +8,7 @@ calculateClimateEffect(
   cohortData,
   pixelGroupMap,
   cceArgs,
+  year,
   gmcsGrowthLimits,
   gmcsMortLimits,
   gmcsMinAge,
@@ -20,6 +21,8 @@ calculateClimateEffect(
 \item{pixelGroupMap}{the pixelGroupMap needed to match cohorts with raster values}
 
 \item{cceArgs}{a list of datasets used by the climate function}
+
+\item{year}{time of simulation - used to select from list of projected climate rasters}
 
 \item{gmcsGrowthLimits}{lower and upper limits to the effect of climate on growth}
 

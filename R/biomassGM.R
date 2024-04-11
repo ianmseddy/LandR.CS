@@ -6,9 +6,11 @@ globalVariables(c(
 #'
 #' Predict biomass change with climate variables
 #'
-#' @param cceArgs a list of datasets used by the climate function
+
 #' @param cohortData The LandR cohortData object
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
+#' @param cceArgs a list of datasets used by the climate function
+#' @param year time of simulation - used to select from list of projected climate rasters
 #' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
 #' @param gmcsMortLimits lower and upper limits to the effect of climate on mortality
 #' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
@@ -21,20 +23,21 @@ globalVariables(c(
 #' @importFrom stats na.omit predict median
 #' @rdname calculateClimateEffect
 #' @export
-calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
+calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs, year,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge,
                                    cohortDefinitionCols = c("age", "speciesCode", "pixelGroup")) {
+
+   # extract relevant args
+  ATA <- cceArgs$projectedClimateRasters$ATA[[year]]
+  CMI <- cceArgs$projectedClimateRasters$CMI[[year]]
+  CMInormal <- cceArgs$historicalClimateRasters$CMI_normal
+  mcsModel <- cceArgs$mcsModel
+  gcsModel <- cceArgs$gcsModel
+
   cohortData <- Copy(cohortData)
   neededCols <- c(cohortDefinitionCols, "B")
   neededCols <- neededCols[neededCols %in% colnames(cohortData)]
   climCohortData <- cohortData[, ..neededCols]
-
-  # extract relevant args
-  ATA <- cceArgs$ATA
-  CMI <- cceArgs$CMI
-  CMInormal <- cceArgs$CMInormal
-  mcsModel <- cceArgs$mcsModel
-  gcsModel <- cceArgs$gcsModel
 
   if (ncell(CMI) != ncell(CMInormal)) {
     stop("different number of pixels in the climate data. Please review how these are created")
@@ -103,11 +106,13 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
 
   # make growth prediction as ratio
   growthPred <- asInteger(predict(gcsModel, predData, level = 0, asList = TRUE, type = "response") /
-    predict(gcsModel, refClim, level = 0, asList = TRUE, type = "response") * 100)
+                            predict(gcsModel, refClim, level = 0, asList = TRUE, type = "response") * 100)
   growthPred[growthPred < min(gmcsGrowthLimits)] <- min(gmcsGrowthLimits)
   growthPred[growthPred > max(gmcsGrowthLimits)] <- max(gmcsGrowthLimits)
+  growthPred[is.na(growthPred)] <- max(gmcsGrowthLimits)
 
   # make mortality prediction
+
   mortPred <- asInteger(predict(
     object = mcsModel, parameter = "mu",
     newdata = predData, level = 0, asList = TRUE, type = "response"
@@ -121,11 +126,11 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
 
   if (anyNA(c(mortPred, growthPred))) {
     mortPred[is.na(mortPred)] <- max(gmcsMortLimits)
-    growthPred[is.na(growthPred)] <- max(gmcsGrowthLimits)
+
     warning("NA in climate prediction. Likely integer overflow - setting to gmcsLimits")
   }
 
-  # predict requires exact asme columns in data.frame at the moment, hence this clumsy rebuilding
+  # predict requires exact same columns in data.frame at the moment, hence this clumsy rebuilding
   climateEffect <- data.table(
     "pixelGroup" = pixelGroupsPostSubset,
     "speciesCode" = speciesCodePostSubset,
