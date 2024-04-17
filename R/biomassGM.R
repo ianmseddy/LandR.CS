@@ -19,7 +19,7 @@ globalVariables(c(
 #' @importFrom data.table setkey data.table
 #' @importFrom reproducible Copy
 #' @importFrom LandR asInteger
-#' @importFrom raster getValues projection ncell
+#' @importFrom terra compareGeom ncell
 #' @importFrom stats na.omit predict median
 #' @rdname calculateClimateEffect
 #' @export
@@ -28,9 +28,9 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs, year,
                                    cohortDefinitionCols = c("age", "speciesCode", "pixelGroup")) {
 
    # extract relevant args
-  ATA <- cceArgs$projectedClimateRasters$ATA[[year]]
-  CMI <- cceArgs$projectedClimateRasters$CMI[[year]]
-  CMInormal <- cceArgs$historicalClimateRasters$CMI_normal
+  ATA <- cceArgs$projectedClimateRasters[["ATA"]][[paste0("year", year)]]
+  CMI <- cceArgs$projectedClimateRasters[["CMI"]][[paste0("year", year)]]
+  CMInormal <- cceArgs$historicalClimateRasters[["CMI_normal"]]
   mcsModel <- cceArgs$mcsModel
   gcsModel <- cceArgs$gcsModel
 
@@ -39,18 +39,15 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs, year,
   neededCols <- neededCols[neededCols %in% colnames(cohortData)]
   climCohortData <- cohortData[, ..neededCols]
 
-  if (ncell(CMI) != ncell(CMInormal)) {
+  if (!compareGeom(CMI, CMInormal, ATA, stopOnError = FALSE)) {
     stop("different number of pixels in the climate data. Please review how these are created")
   }
 
-  if (projection(ATA) != projection(CMInormal)) {
-    stop("CRS of climate data is not identical. Please review how these are created")
-  }
 
-  CMIvals <- getValues(CMI)
-  CMInormalvals <- getValues(CMInormal)
-  ATAvals <- getValues(ATA)
-  pixels <- getValues(pixelGroupMap)
+  CMIvals <- as.vector(CMI)
+  CMInormalvals <- as.vector(CMInormal)
+  ATAvals <- as.vector(ATA)
+  pixels <- as.vector(pixelGroupMap)
 
   # Center observations on mean of original model data
   climateMatch <- data.table(
