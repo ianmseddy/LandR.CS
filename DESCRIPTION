@@ -21,9 +21,9 @@ Imports:
     LandR,
     nlme, 
     methods,
-    raster,
     reproducible,
-    stats
+    stats,
+    terra
 Remotes:
     PredictiveEcology/LandR@development
 Encoding: UTF-8
