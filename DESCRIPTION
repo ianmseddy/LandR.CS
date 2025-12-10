@@ -5,13 +5,13 @@ Description: This package contains climate-sensitive growth and mortality functi
     and most robust method is to use the SpaDES module 'gmcsDataPrep' and R package 'PSPclean'.
 URL: 
     https://github.com/ianmseddy/LandR.CS
-Version: 0.0.3.9003
+Version: 1.0.0.9001
 Authors@R: c(
     person("Ian", "Eddy", email = "ian.eddy@canada.com",
            role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7397-2116")),
     person("Alex M", "Chubaty", email = "achubaty@for-cast.ca",
            role = c("ctb"), comment = c(ORCID = "0000-0001-7146-8135")),
-    person(given = paste("Her Majesty the Queen in Right of Canada,",
+    person(given = paste("His Majesty the King in Right of Canada,",
            "as represented by the Minister of Natural Resources Canada"), role = "cph")
     )
 Depends:
@@ -19,7 +19,7 @@ Depends:
 Imports: 
     data.table,
     LandR,
-    nlme, 
+    xgboost,
     methods,
     reproducible,
     stats,
