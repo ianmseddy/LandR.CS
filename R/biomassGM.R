@@ -1,10 +1,3 @@
-globalVariables(c(
-  ".", "age", "logAge", "pixelGroup", "..cohortDefinitionCols", "..addedColumns", "..neededCols", 
-  ":=", "spp", "speciesCode", "obs", "pred", "resid"
-))
-
-#'  Calculate climate effect
-#'
 #' Predict biomass change with climate variables
 #'
 
@@ -17,17 +10,16 @@ globalVariables(c(
 #' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
 #'                   younger ages are weighted toward a null effect with decreasing age
 #' @param cohortDefinitionCols cohortData columns that determine individual cohorts
-#' @importFrom data.table setkey data.table
-#' @importFrom reproducible Copy
+#' @importFrom data.table `:=` as.data.table data.table rbindlist set setkey setnames 
 #' @importFrom LandR asInteger
-#' @importFrom terra compareGeom ncell
+#' @importFrom terra ncell rast
 #' @importFrom stats na.omit predict median
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                                    gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge,
                                    cohortDefinitionCols = c("age", "speciesCode", "pixelGroup")) {
-
+  
   originalCD <- cohortData
   cohortData <- copy(cohortData)
    # extract relevant args
@@ -43,26 +35,24 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   
   # Get the variables which require anomalies
   # Note if anomaly variables become available directly, they should be 'unnamed'
-  # to skip the steps
+  # to skip the steps that manually calculate them
   anomalyVariables <- setdiff(names(climateVariables), "")
   if (length(anomalyVariables)) {
-  anomalyVariables <- setdiff(names(climateVariables), "")
-  varsWithAnomalies <- climateVariables[anomalyVariables]
-  normalNames <- paste0(varsWithAnomalies, "_normal")
-  climateNormal <- cceArgs$historicalClimateRasters[normalNames] |>
-    rast()
-  anomalyRasters <- terra::subset(climateRasters, varsWithAnomalies)
-  names(climateNormal) <- names(anomalyRasters)
-  #TODO: think of ways this might get screwed up - prevent it 
-  #there is probably a clever way.
-
-  anomalyOut <- lapply(varsWithAnomalies, 
-                           function(anomaly, normals = climateNormal, current = anomalyRasters) {
-                             anomalyRas <- current[[anomaly]] - normals[[anomaly]]
-                           }) |>
-    rast()
-  names(anomalyOut) <- anomalyVariables
-  allClimateRas <- c(climateRasters, anomalyOut)
+    anomalyVariables <- setdiff(names(climateVariables), "")
+    varsWithAnomalies <- climateVariables[anomalyVariables]
+    normalNames <- paste0(varsWithAnomalies, "_normal")
+    climateNormal <- cceArgs$historicalClimateRasters[normalNames] |>
+      rast()
+    anomalyRasters <- terra::subset(climateRasters, varsWithAnomalies)
+    names(climateNormal) <- names(anomalyRasters)
+    #TODO: think of ways this might get screwed up - prevent it 
+    anomalyOut <- lapply(varsWithAnomalies, 
+                         function(anomaly, normals = climateNormal, current = anomalyRasters) {
+                           anomalyRas <- current[[anomaly]] - normals[[anomaly]]
+                         }) |>
+      rast()
+    names(anomalyOut) <- anomalyVariables
+    allClimateRas <- c(climateRasters, anomalyOut)
   } else { 
     allClimateRas <- climateRasters 
   }
@@ -72,7 +62,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   climateCovariates <- climateCovariates[pixelGroupDT, on = c("cell" = "pixelIndex")]
   #calculate the mean climate variable for each pixelGroup, as some groups overlap multiple pixels
   climateCovariates <- climateCovariates[!is.na(pixelGroup), lapply(.SD, mean), 
-                    .SDcol = names(allClimateRas), .(pixelGroup)]
+                    .SDcols = names(allClimateRas), .(pixelGroup)]
   
   historicalClimate <- as.data.table(climateNormal, cells = TRUE)
   historicalClimate <- historicalClimate[pixelGroupDT, on = c("cell" = "pixelIndex")]
@@ -144,14 +134,14 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
 
 #' @param cohortData The LandR cohortData object
 #' @param climateCovariates data.table of mean climate covariates by pixelGroup 
-#' @param cohortDefinitionCols cohortData columns that determine individual cohorts
 #' @param stat character vector of either "growth" or "mortality"
 #' this is used to name the pred column and exponentiate predicted growth if applicable
 #' @importFrom data.table setkey data.table
-#' @importFrom reproducible Copy
 #' @importFrom LandR asInteger
-#' @importFrom terra compareGeom ncell
-#' @importFrom data.table melt.data.table copy
+#' @importFrom terra ncell
+#' @importFrom data.table as.data.table copy melt.data.table rbindlist setnames `.` `.SD`
+#' @importFrom stats model.matrix
+#' @keywords internal
 #' @rdname getModelPred
 getModelPred <- function(cohortData, climateCovariates, gmcsModel, stat = "growth") {
   
@@ -190,8 +180,10 @@ getModelPred <- function(cohortData, climateCovariates, gmcsModel, stat = "growt
   out <- out[, .(predCol = mean(predCol)), .(speciesCode, pixelGroup)]
   
   if (stat == "growth") {
-    out[, stat := exp(stat)]
+    out[, predCol := exp(predCol)]
   }
+  #rename column to either mortality or growth
+  setnames(out, "predCol", stat)
   
   return(out)
 }

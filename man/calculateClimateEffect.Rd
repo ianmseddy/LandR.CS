@@ -2,13 +2,12 @@
 % Please edit documentation in R/biomassGM.R
 \name{calculateClimateEffect}
 \alias{calculateClimateEffect}
-\title{Calculate climate effect}
+\title{Predict biomass change with climate variables}
 \usage{
 calculateClimateEffect(
   cohortData,
   pixelGroupMap,
   cceArgs,
-  year,
   gmcsGrowthLimits,
   gmcsMortLimits,
   gmcsMinAge,
@@ -22,8 +21,6 @@ calculateClimateEffect(
 
 \item{cceArgs}{a list of datasets used by the climate function}
 
-\item{year}{time of simulation - used to select from list of projected climate rasters}
-
 \item{gmcsGrowthLimits}{lower and upper limits to the effect of climate on growth}
 
 \item{gmcsMortLimits}{lower and upper limits to the effect of climate on mortality}
@@ -32,6 +29,8 @@ calculateClimateEffect(
 younger ages are weighted toward a null effect with decreasing age}
 
 \item{cohortDefinitionCols}{cohortData columns that determine individual cohorts}
+
+\item{year}{time of simulation - used to select from list of projected climate rasters}
 }
 \description{
 Predict biomass change with climate variables
