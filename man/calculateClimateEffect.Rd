@@ -29,8 +29,6 @@ calculateClimateEffect(
 younger ages are weighted toward a null effect with decreasing age}
 
 \item{cohortDefinitionCols}{cohortData columns that determine individual cohorts}
-
-\item{year}{time of simulation - used to select from list of projected climate rasters}
 }
 \description{
 Predict biomass change with climate variables

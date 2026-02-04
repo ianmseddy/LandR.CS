@@ -19,9 +19,7 @@ Depends:
 Imports: 
     data.table,
     LandR,
-    xgboost,
     methods,
-    reproducible,
     stats,
     terra
 Remotes:

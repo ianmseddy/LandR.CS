@@ -4,7 +4,6 @@
 #' @param cohortData The LandR cohortData object
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
 #' @param cceArgs a list of datasets used by the climate function
-#' @param year time of simulation - used to select from list of projected climate rasters
 #' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
 #' @param gmcsMortLimits lower and upper limits to the effect of climate on mortality
 #' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
@@ -139,7 +138,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
 #' @importFrom data.table setkey data.table
 #' @importFrom LandR asInteger
 #' @importFrom terra ncell
-#' @importFrom data.table as.data.table copy melt.data.table rbindlist setnames `.` `.SD`
+#' @importFrom data.table as.data.table copy melt.data.table rbindlist setnames
 #' @importFrom stats model.matrix
 #' @keywords internal
 #' @rdname getModelPred
