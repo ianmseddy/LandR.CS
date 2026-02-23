@@ -29,7 +29,13 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   #assume climate variables are denoted by cceArgs$climateVariables
   climateVariables <- cceArgs$climateVariablesForGMCS
   climateRasters <- cceArgs$projectedClimateRasters
-  rasterToGet <- paste0("year", cceArgs$climateYear)
+  
+  if (!is.null(cceArgs$climateYear)) {
+    rasterToGet <- paste0("year", cceArgs$climateYear)
+  } else {
+    rastertoGet <- paste0("year", time)
+  }
+  
   #make composite raster
   climateRasters <- lapply(climateRasters[climateVariables], "[[", rasterToGet) |>
     rast()
