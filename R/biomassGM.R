@@ -5,29 +5,31 @@
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
 #' @param cceArgs a list of datasets used by the climate function
 #' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
-#' @param gmcsMortLimits lower and upper limits to the effect of climate on mortality
 #' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
 #'                   younger ages are weighted toward a null effect with decreasing age
+#' @param time the time of simulation - only used for writing outputs if applicable
 #' @param cohortDefinitionCols cohortData columns that determine individual cohorts
-#' @importFrom data.table `:=` as.data.table data.table rbindlist set setkey setnames 
+#' @importFrom data.table `:=` as.data.table data.table fwrite rbindlist set setkey setnames 
 #' @importFrom LandR asInteger
 #' @importFrom terra ncell rast
 #' @importFrom stats na.omit predict median
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
-                                   gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge,
+                                   gmcsGrowthLimits, gmcsMinAge, time = NULL,
                                    cohortDefinitionCols = c("age", "speciesCode", "pixelGroup")) {
   
   originalCD <- cohortData
   cohortData <- copy(cohortData)
-   # extract relevant args
+  cohortTooYoung <- cohortData[age < gmcsMinAge]
+  
+  # extract relevant args
   
   #assume that climate normals are present in cceArgs as cceArts$historicalClimate$historical_<var>_normal
   #assume climate variables are denoted by cceArgs$climateVariables
   climateVariables <- cceArgs$climateVariablesForGMCS
   climateRasters <- cceArgs$projectedClimateRasters
-   rasterToGet <- paste0("year", cceArgs$climateYear)
+  rasterToGet <- paste0("year", cceArgs$climateYear)
   #make composite raster
   climateRasters <- lapply(climateRasters[climateVariables], "[[", rasterToGet) |>
     rast()
@@ -44,7 +46,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
       rast()
     anomalyRasters <- terra::subset(climateRasters, varsWithAnomalies)
     names(climateNormal) <- names(anomalyRasters)
-    #TODO: think of ways this might get screwed up - prevent it 
+    #TODO: think of ways this might get screwed up - prevent them 
     anomalyOut <- lapply(varsWithAnomalies, 
                          function(anomaly, normals = climateNormal, current = anomalyRasters) {
                            anomalyRas <- current[[anomaly]] - normals[[anomaly]]
@@ -61,7 +63,7 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   climateCovariates <- climateCovariates[pixelGroupDT, on = c("cell" = "pixelIndex")]
   #calculate the mean climate variable for each pixelGroup, as some groups overlap multiple pixels
   climateCovariates <- climateCovariates[!is.na(pixelGroup), lapply(.SD, mean), 
-                    .SDcols = names(allClimateRas), .(pixelGroup)]
+                                         .SDcols = names(allClimateRas), .(pixelGroup)]
   
   historicalClimate <- as.data.table(climateNormal, cells = TRUE)
   historicalClimate <- historicalClimate[pixelGroupDT, on = c("cell" = "pixelIndex")]
@@ -74,18 +76,17 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   #TODO: 
   #dataprep should use a function to at least confirm colnames and units correct
   # standBiomass + biomass in g/m2, logAge = logged standAge (ie identical by cohort in PG),
- 
   #subset cd for necessary columns
-  cohortData <- cohortData[, .(speciesCode, B, mortality, age, pixelGroup)]
+  cohortData <- cohortData[age >= gmcsMinAge, .(speciesCode, B, mortality, age, pixelGroup)]
   
   #calculate biomass-weighted age, then log it
   cohortData[, standBiomass := sum(B), .(pixelGroup)]
   cohortData[, weightedAge := sum(B * age)/standBiomass, .(pixelGroup)]
   cohortData[, logAge := log(weightedAge)]
-  #we can predict species but not individual cohorts (this is absent from PSP, as we do not have their ages)
-  #in the event there are other columns in cohortData - subset like so
+  
+  #collapse cohorts by species
   cd <- cohortData[, .(biomass = sum(B)), .(pixelGroup, speciesCode, logAge, standBiomass)]
-
+  
   #Make predictions
   predictedGrowth <- lapply(list(climateCovariates, historicalClimate), 
                             getModelPred, cohortData = cd, 
@@ -93,35 +94,71 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
                             stat = "growth")
   #take the 'historical' prediction for calculation of modifier
   subsetDT <- predictedGrowth[[2]][, .(pixelGroup, speciesCode, growth)]
-  setnames(subsetDT, "growth", "historicalGrowth")
+  setnames(subsetDT, "growth", "pred_historicalGrowth")
+  setnames(predictedGrowth[[1]], old = "growth", new = "pred_currentGrowth")
   #take means before join to avoid having to track fold
-
+  
   predictedGrowth <- predictedGrowth[[1]][subsetDT, on = c("pixelGroup", "speciesCode")]
-  predictedGrowth[, growthPred := asInteger(growth/historicalGrowth * 100)]
+  predictedGrowth[, growthPred := asInteger(pred_currentGrowth/pred_historicalGrowth * 100)]
   cohortData <- cohortData[predictedGrowth, on = c("pixelGroup", "speciesCode")]
   # TODO: Reduce duplication and wrap these 2 in a function
-  # this final wrapper is hurting my brain right now
   # getModelPred is needlessly building the model matrix 4 times (historical/current/growth/mort)
   # the outer wrapper should this?
   predictedMortality <- lapply(list(climateCovariates, historicalClimate), 
-                            getModelPred, cohortData = cd, 
-                            gmcsModel = cceArgs$mcsModel, 
-                            stat = "mortality")
+                               getModelPred, cohortData = cd, 
+                               gmcsModel = cceArgs$mcsModel, 
+                               stat = "mortality")
   #take the 'historical' prediction for calculation of modifier
   subsetDT <- predictedMortality[[2]][, .(pixelGroup, speciesCode, mortality)]
-  setnames(subsetDT, "mortality", "historicalMortality")
+  
+  #note cohort data has existing mortality column
+  setnames(subsetDT, "mortality", "pred_historicalMortality")
+  setnames(predictedMortality[[1]], old = "mortality", new = "pred_currentMortality")
   #take means before join to avoid having to track fold
   
   predictedMortality <- predictedMortality[[1]][subsetDT, on = c("pixelGroup", "speciesCode")]
-  predictedMortality[, mortPred := asInteger(mortality/historicalMortality * 100)]
-  cohortData <- cohortData[predictedMortality, on = c("pixelGroup", "speciesCode")]
-  #could do this in getModelPred but I prefer to see the preds prior to ceiling/floor application
-  cohortData[, mortPred := pmax(min(gmcsMortLimits), pmin(mortPred, max(gmcsMortLimits)))]
-  cohortData[, growthPred := pmax(min(gmcsGrowthLimits), pmin(growthPred, max(gmcsGrowthLimits)))]
+  #mortality modifier is in g/m2
+  #apply modifiers here 
+  predictedMortality[pred_currentMortality < 0, pred_currentMortality := 0]
+  predictedMortality[pred_historicalMortality < 0, pred_historicalMortality := 0]
   
-  #TODO: discuss how to deal with this - does it affect b-weighted standAge?
-  cohortData[age < gmcsMinAge, .(growthPred, mortPred) := c(100, 100)]
-  return(cohortData)
+  #TODO:  and make sure the modifier is scaled by speciesB 
+  predictedMortality[, mortPred := asInteger(pred_currentMortality - pred_historicalMortality)]
+  cohortData <- cohortData[predictedMortality, on = c("pixelGroup", "speciesCode")]
+  
+  cohortData[, growthPred := pmax(min(gmcsGrowthLimits), pmin(growthPred, max(gmcsGrowthLimits)))]
+  #distribute mortality according to B 
+  # B here is summed by species - so rename
+  setnames(cohortData, "B", "speciesB")
+  cohortData <- cohortData[, .(pixelGroup, speciesCode, speciesB, standBiomass, growthPred, mortPred)]
+  cohortData <- cohortData[originalCD, on = c("pixelGroup", "speciesCode")]
+  #TODO: you need to make sure you calculate the B without including those young ones, 
+  # doublecheck
+  cohortData[!is.na(mortPred), mortPred := c(mortPred * B/speciesB)]
+  cohortData[, c("speciesB", "standBiomass") := NULL]
+  
+  cohortData[is.na(growthPred), c("growthPred", "mortPred") := .(100, 0)]
+  
+  if (getOption("LandR.CS.debug")) {
+    logPath <- getOption("LandR.CS.logPath")
+    if (is.null(logPath)) {
+      logPath <- "outputs/gmcsDataPrep"
+    }
+    if (!dir.exists(logPath)) {
+      dir.create(logPath, recursive = TRUE)
+    }
+    
+    logFile <- predictedMortality[predictedGrowth, on = c("pixelGroup", "speciesCode")]
+    logFile <- logFile[climateCovariates, on = c("pixelGroup")]
+    logFile[, ClimateYear := rasterToGet]
+    logFile[, year := time]
+    outFile <- paste0(logPath, "/gmcsPred_", time, ".csv")
+    data.table::fwrite(x = logFile, file = outFile) #TODO use arrow
+  }
+  #keep only the necessary columns here
+  #TODO: this approach may not be safe for nonstandard `cohortDefinitonCols`
+  cohortData <- cohortData[, .SD, .SDcols = c(cohortDefinitionCols, "growthPred", "mortPred")]
+  return(cohortData = cohortData)
 }
 
 #' getModelPred
