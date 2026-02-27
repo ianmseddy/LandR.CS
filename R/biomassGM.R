@@ -21,8 +21,6 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   
   originalCD <- cohortData
   cohortData <- copy(cohortData)
-  cohortTooYoung <- cohortData[age < gmcsMinAge]
-  
   # extract relevant args
   
   #assume that climate normals are present in cceArgs as cceArts$historicalClimate$historical_<var>_normal
@@ -106,10 +104,9 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   
   predictedGrowth <- predictedGrowth[[1]][subsetDT, on = c("pixelGroup", "speciesCode")]
   predictedGrowth[, growthPred := asInteger(pred_currentGrowth/pred_historicalGrowth * 100)]
+  
+  #back to cohorts separated by age
   cohortData <- cohortData[predictedGrowth, on = c("pixelGroup", "speciesCode")]
-  # TODO: Reduce duplication and wrap these 2 in a function
-  # getModelPred is needlessly building the model matrix 4 times (historical/current/growth/mort)
-  # the outer wrapper should this?
   predictedMortality <- lapply(list(climateCovariates, historicalClimate), 
                                getModelPred, cohortData = cd, 
                                gmcsModel = cceArgs$mcsModel, 
@@ -128,21 +125,29 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   predictedMortality[pred_currentMortality < 0, pred_currentMortality := 0]
   predictedMortality[pred_historicalMortality < 0, pred_historicalMortality := 0]
   
-  #TODO:  and make sure the modifier is scaled by speciesB 
   predictedMortality[, mortPred := asInteger(pred_currentMortality - pred_historicalMortality)]
+  #need pooled biomass
+  #this is the species-level biomass - must be called this for predict
+  predictedMortality <- predictedMortality[cd[, .(pixelGroup, speciesCode, biomass)],
+                                           on = c("pixelGroup", "speciesCode")]
+  setnames(predictedMortality, old = "biomass", new = "speciesB")
+
   cohortData <- cohortData[predictedMortality, on = c("pixelGroup", "speciesCode")]
   
   cohortData[, growthPred := pmax(min(gmcsGrowthLimits), pmin(growthPred, max(gmcsGrowthLimits)))]
   #distribute mortality according to B 
   # B here is summed by species - so rename
-  setnames(cohortData, "B", "speciesB")
-  cohortData <- cohortData[, .(pixelGroup, speciesCode, speciesB, standBiomass, growthPred, mortPred)]
-  cohortData <- cohortData[originalCD, on = c("pixelGroup", "speciesCode")]
-  #TODO: you need to make sure you calculate the B without including those young ones, 
-  # doublecheck
-  cohortData[!is.na(mortPred), mortPred := c(mortPred * B/speciesB)]
+
+  cohortData <- cohortData[, .(pixelGroup, speciesCode, age,  B, speciesB, standBiomass, growthPred, mortPred)]
+  #join back in the tooYoung
+  tooYoung <- originalCD[age < gmcsMinAge,]
+  
+  # speciesB is not including cohorts that are below the minimum age
+  cohortData[, mortPred := c(mortPred * B/speciesB)]
   cohortData[, c("speciesB", "standBiomass") := NULL]
   
+  #add back in those that are too young
+  cohortData <- rbind(cohortData, tooYoung, fill = TRUE)
   cohortData[is.na(growthPred), c("growthPred", "mortPred") := .(100, 0)]
   
   if (getOption("LandR.CS.debug")) {
@@ -162,8 +167,8 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
     data.table::fwrite(x = logFile, file = outFile) #TODO use arrow
   }
   #keep only the necessary columns here
-  #TODO: this approach may not be safe for nonstandard `cohortDefinitonCols`
   cohortData <- cohortData[, .SD, .SDcols = c(cohortDefinitionCols, "growthPred", "mortPred")]
+  
   return(cohortData = cohortData)
 }
 
