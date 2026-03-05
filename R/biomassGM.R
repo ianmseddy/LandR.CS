@@ -158,9 +158,11 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
     if (!dir.exists(logPath)) {
       dir.create(logPath, recursive = TRUE)
     }
-    
+
     logFile <- predictedMortality[predictedGrowth, on = c("pixelGroup", "speciesCode")]
-    logFile <- logFile[climateCovariates, on = c("pixelGroup")]
+    logFile <- logFile[cd, on = c("pixelGroup", "speciesCode", "speciesB" = "biomass")]
+    logFile <- climateCovariates[logFile, on = c("pixelGroup")]
+    logFile <- logFile[!speciesCode == ""] #these are pixels where all cohorts were too young
     logFile[, ClimateYear := rasterToGet]
     logFile[, year := time]
     outFile <- paste0(logPath, "/gmcsPred_", time, ".csv")
