@@ -3,7 +3,7 @@
 
 #' @param cohortData The LandR cohortData object
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
-#' @param cceArgs a list of datasets used by the climate function
+#' @param cceArgs a list of additional data and arguments used by the climate function
 #' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
 #' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
 #'                   younger ages are weighted toward a null effect with decreasing age
@@ -22,22 +22,24 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   originalCD <- cohortData
   cohortData <- copy(cohortData)
   # extract relevant args
-  
   #assume that climate normals are present in cceArgs as cceArts$historicalClimate$historical_<var>_normal
   #assume climate variables are denoted by cceArgs$climateVariables
-  climateVariables <- cceArgs$climateVariablesForGMCS
-  climateRasters <- cceArgs$projectedClimateRasters
-  
   if (!is.null(cceArgs$climateYear)) {
-    rasterToGet <- paste0("year", cceArgs$climateYear)
+    thisYear <- cceArgs$climateYear
   } else {
-    rastertoGet <- paste0("year", time)
+    thisYear <- time
   }
   
-  #make composite raster
-  climateRasters <- lapply(climateRasters[climateVariables], "[[", rasterToGet) |>
-    rast()
-  
+  climateVariables <- cceArgs$climateVariablesForGMCS
+  if (!is.null(cceArgs$currentClimateRasters)) {
+    climateRasters <- cceArgs$currentClimateRasters[[climateVariables]]
+  } else if (!is.null(cceArgs$projectedClimateRasters)) {
+    climateRasters <- cceArgs$projectedClimateRasters
+    climateRasters <- lapply(climateRasters[climateVariables], "[[", paste0("year", thisYear)) |>
+      rast()
+  } else {
+    stop("no method of obtaining climate data for LandR.CS")
+  }
   # Get the variables which require anomalies
   # Note if anomaly variables become available directly, they should be 'unnamed'
   # to skip the steps that manually calculate them
@@ -139,37 +141,32 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   # B here is summed by species - so rename
 
   cohortData <- cohortData[, .(pixelGroup, speciesCode, age,  B, speciesB, standBiomass, growthPred, mortPred)]
-  #join back in the tooYoung
+
   tooYoung <- originalCD[age < gmcsMinAge,]
   
-  # speciesB is not including cohorts that are below the minimum age
+  # speciesB does not include cohorts that are below the minimum age
+  # this scales the prediction (in g/m2) by cohort biomass 
+  # (for each species, for when 2 or more cohorts are present)
   cohortData[, mortPred := c(mortPred * B/speciesB)]
-  cohortData[, c("speciesB", "standBiomass") := NULL]
+  # cohortData[, c("speciesB", "standBiomass") := NULL]
   
-  #add back in those that are too young
+  if (is.null(cceArgs$climateYear)) {
+    cohortData[, climateYear := time]
+  } else {
+    cohortData[, climateYear := cceArgs$climateYear]
+  }
+  #due to creation of summary module, decided to add these columns back in
+  cohortData <- data.table::merge.data.table(cohortData, 
+                    predictedGrowth[, .(pred_currentGrowth, pred_historicalGrowth, pixelGroup, speciesCode)])
+  cohortData <- data.table::merge.data.table(cohortData, 
+                                             predictedMortality[, .(pred_currentMortality, pred_historicalMortality, 
+                                                                    pixelGroup, speciesCode)])
+  cohortData <- climateCovariates[cohortData, on = c("pixelGroup")]
+  #now add back in those that are too young
+  #TODO first subset the columns of tooYoung so it doesnt' add bPM, bAP, mAge, etc. 
+  tooYoung <- tooYoung[, intersect(names(tooYoung), names(cohortData)), with = FALSE]
   cohortData <- rbind(cohortData, tooYoung, fill = TRUE)
   cohortData[is.na(growthPred), c("growthPred", "mortPred") := .(100, 0)]
-  
-  if (getOption("LandR.CS.debug")) {
-    logPath <- getOption("LandR.CS.logPath")
-    if (is.null(logPath)) {
-      logPath <- "outputs/gmcsDataPrep"
-    }
-    if (!dir.exists(logPath)) {
-      dir.create(logPath, recursive = TRUE)
-    }
-
-    logFile <- predictedMortality[predictedGrowth, on = c("pixelGroup", "speciesCode")]
-    logFile <- logFile[cd, on = c("pixelGroup", "speciesCode", "speciesB" = "biomass")]
-    logFile <- climateCovariates[logFile, on = c("pixelGroup")]
-    logFile <- logFile[!speciesCode == ""] #these are pixels where all cohorts were too young
-    logFile[, ClimateYear := rasterToGet]
-    logFile[, year := time]
-    outFile <- paste0(logPath, "/gmcsPred_", time, ".csv")
-    data.table::fwrite(x = logFile, file = outFile) #TODO use arrow
-  }
-  #keep only the necessary columns here
-  cohortData <- cohortData[, .SD, .SDcols = c(cohortDefinitionCols, "growthPred", "mortPred")]
   
   return(cohortData = cohortData)
 }

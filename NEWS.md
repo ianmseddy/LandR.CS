@@ -1,3 +1,13 @@
+version 2.0.0.9005
+- all model columns and predictions are now returned, includign the historical and current growth and mortality and all climate covariates
+- The function determines which climate data to use based on the contents of cceArgs, using the following precedence order to maintain backward compatibility with earlier interfaces:
+  currentClimateRasters (highest precedence) - if cceArgs$currentClimateRasters is supplied, these rasters are used directly and no other climate arguments are evaluated.
+  climateYear - if currentClimateRasters is not supplied and cceArgs$climateYear is provided, the function retrieves the corresponding year from projectedClimateRasters.
+  Time - if neither currentClimateRasters nor climateYear are supplied, the function attempts to retrieve the raster matching Time from projectedClimateRasters
+  Failure condition - if none of the above are available (or if projectedClimateRasters is missing when required), the function stops with an error.
+ 
+
+
 version 2.0.0
 
 # this represents a major overhaul
