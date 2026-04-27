@@ -167,6 +167,12 @@ calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
   tooYoung <- tooYoung[, intersect(names(tooYoung), names(cohortData)), with = FALSE]
   cohortData <- rbind(cohortData, tooYoung, fill = TRUE)
   cohortData[is.na(growthPred), c("growthPred", "mortPred") := .(100, 0)]
+
+  #join back in LandR model growth for diagnostic purposes
+  
+  sub <- originalCD[, .(maxANPP, speciesCode, age, pixelGroup)]
+  cohortData <- sub[cohortData, on = c("speciesCode", "age", "pixelGroup")]
+  setcolorder(cohortData, c("pixelGroup", "age", "B"))
   
   return(cohortData = cohortData)
 }
