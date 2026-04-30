@@ -17,7 +17,7 @@ this is used to name the pred column and exponentiate predicted growth if applic
 \description{
 Join cohortData with either the growth or mortality xgboost models
 This is a utility function to avoid repetition as 2 predictions are needed
-for each model (under the current climate, and historical) to achieve the 
+for each model (under the current climate, and historical) to achieve the
 climate modifier
 }
 \keyword{internal}

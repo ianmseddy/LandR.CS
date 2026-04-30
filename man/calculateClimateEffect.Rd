@@ -19,7 +19,7 @@ calculateClimateEffect(
 
 \item{pixelGroupMap}{the pixelGroupMap needed to match cohorts with raster values}
 
-\item{cceArgs}{a list of datasets used by the climate function}
+\item{cceArgs}{a list of additional data and arguments used by the climate function}
 
 \item{gmcsGrowthLimits}{lower and upper limits to the effect of climate on growth}
 

@@ -1,3 +1,5 @@
+version 2.0.0.9007
+- makeClimateVariablesForGMCS now available to prepare climate variables for simulations and model fitting
 version 2.0.0.9005
 - all model columns and predictions are now returned, includign the historical and current growth and mortality and all climate covariates
 - The function determines which climate data to use based on the contents of cceArgs, using the following precedence order to maintain backward compatibility with earlier interfaces:
