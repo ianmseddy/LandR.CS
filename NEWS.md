@@ -1,3 +1,14 @@
+version 2.1.0
+
+- CI: the `R-CMD-check`, `test-coverage` and `pkgdown` workflows are now thin callers of the
+  shared reusable workflows in [PredictiveEcology/actions](https://github.com/PredictiveEcology/actions),
+  pinned at `@v0.5`. This resolves the deprecated Node 20 runtime warnings (#10) and means future
+  runner-runtime updates are picked up centrally rather than needing a per-repo bump;
+- CI: dropped the BioSIM / J4R / NLMR / fastshp installs and the development-branch pins for
+  quickPlot / reproducible / Require / SpaDES.core / SpaDES.tools. These had been copied from LandR;
+  nothing in LandR.CS references them;
+
+
 version 2.0.0.9005
 - all model columns and predictions are now returned, includign the historical and current growth and mortality and all climate covariates
 - The function determines which climate data to use based on the contents of cceArgs, using the following precedence order to maintain backward compatibility with earlier interfaces:
