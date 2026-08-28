@@ -2,15 +2,15 @@
 % Please edit documentation in R/biomassGM.R
 \name{calculateClimateEffect}
 \alias{calculateClimateEffect}
-\title{CalculateClimateEffect}
+\title{Predict biomass change with climate variables}
 \usage{
 calculateClimateEffect(
   cohortData,
   pixelGroupMap,
   cceArgs,
   gmcsGrowthLimits,
-  gmcsMortLimits,
   gmcsMinAge,
+  time = NULL,
   cohortDefinitionCols = c("age", "speciesCode", "pixelGroup")
 )
 }
@@ -23,10 +23,10 @@ calculateClimateEffect(
 
 \item{gmcsGrowthLimits}{lower and upper limits to the effect of climate on growth}
 
-\item{gmcsMortLimits}{lower and upper limits to the effect of climate on mortality}
-
 \item{gmcsMinAge}{minimum age for which to predict full effect of growth/mortality -
 younger ages are weighted toward a null effect with decreasing age}
+
+\item{time}{the time of simulation - only used for writing outputs if applicable}
 
 \item{cohortDefinitionCols}{cohortData columns that determine individual cohorts}
 }

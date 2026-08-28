@@ -1,0 +1,18 @@
+# Thin caller — shared logic lives in PredictiveEcology/actions (reusable workflow).
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+name: pkgdown
+
+jobs:
+  pkgdown:
+    uses: PredictiveEcology/actions/.github/workflows/pkgdown.yaml@v0.5
+    with:
+      extra-packages: |
+        PredictiveEcology/LandR@development

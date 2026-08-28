@@ -1,316 +1,241 @@
-globalVariables(c(
-  ".", "age", "logAge", "pixelGroup", "..cohortDefinitionCols", "..addedColumns", "..neededCols", ":="
-))
-
-
-#'  CalculateClimateEffect
+#' Predict biomass change with climate variables
 #'
-#'  Predict biomass change with climate variables
-#'
-#' @param cceArgs a list of datasets used by the climate function
+
 #' @param cohortData The LandR cohortData object
 #' @param pixelGroupMap the pixelGroupMap needed to match cohorts with raster values
+#' @param cceArgs a list of additional data and arguments used by the climate function
 #' @param gmcsGrowthLimits lower and upper limits to the effect of climate on growth
-#' @param gmcsMortLimits lower and upper limits to the effect of climate on mortality
 #' @param gmcsMinAge minimum age for which to predict full effect of growth/mortality -
-#' younger ages are weighted toward a null effect with decreasing age
+#'                   younger ages are weighted toward a null effect with decreasing age
+#' @param time the time of simulation - only used for writing outputs if applicable
 #' @param cohortDefinitionCols cohortData columns that determine individual cohorts
-#' @importFrom data.table setkey data.table copy
+#' @importFrom data.table `:=` as.data.table data.table fwrite rbindlist set setkey setnames 
 #' @importFrom LandR asInteger
-#' @importFrom raster getValues projection ncell
+#' @importFrom terra ncell rast
 #' @importFrom stats na.omit predict median
 #' @rdname calculateClimateEffect
 #' @export
 calculateClimateEffect <- function(cohortData, pixelGroupMap, cceArgs,
-                                   gmcsGrowthLimits, gmcsMortLimits, gmcsMinAge,
-                                   cohortDefinitionCols = c("age", 'speciesCode', 'pixelGroup')){
+                                   gmcsGrowthLimits, gmcsMinAge, time = NULL,
+                                   cohortDefinitionCols = c("age", "speciesCode", "pixelGroup")) {
+  
+  originalCD <- cohortData
   cohortData <- copy(cohortData)
-  neededCols <- c(cohortDefinitionCols, 'B')
-  neededCols <- neededCols[neededCols %in% colnames(cohortData)]
-  climCohortData <- cohortData[, ..neededCols]
-
-  #extract relevant args
-  ATA <- cceArgs$ATA
-  CMI <- cceArgs$CMI
-  CMInormal <- cceArgs$CMInormal
-  mcsModel <- cceArgs$mcsModel
-  gcsModel <- cceArgs$gcsModel
-
-  if (ncell(CMI) != ncell(CMInormal)) {
-    stop("different number of pixels in the climate data. Please review how these are created")
-  }
-
-  if (projection(ATA) != projection(CMInormal)) {
-    stop("CRS of climate data is not identical. Please review how these are created")
-  }
-
-  CMIvals <- getValues(CMI)
-  CMInormalvals <- getValues(CMInormal)
-  ATAvals <- getValues(ATA)
-  pixels <- getValues(pixelGroupMap)
-
-  #Center observations on mean of original model data
-  climateMatch <- data.table("pixelGroup" = pixels,
-                             "CMI" = CMIvals,
-                             "ATA" = ATAvals,
-                             'CMInormal' = CMInormalvals)
-
-  climateMatch <- climateMatch[!is.na(pixelGroup)]
-  #Not all pixelGroups are in pixelGroupMap, because climCohortData is a subset
-  #Take the median climate for each pixel group as some pixelgroups occur across multiple climate raster pixels
-  climValues <- climateMatch[, .("CMI" = median(CMI, na.rm = TRUE),
-                                 "ATA" = median(ATA, na.rm = TRUE),
-                                 "CMInormal" = median(CMInormal, na.rm = TRUE)), by = "pixelGroup"]
-
-  climCohortData[, logAge := log(age)]
-  #set age = 0 to 1, to prevent -inf in prediction - this shouldn't affect predictions due to minimum age
-  climCohortData[age == 0, logAge := 0]
-  setkey(climCohortData, pixelGroup)
-  setkey(climValues, pixelGroup)
-
-  #Join cohort Data with climate data
-  predData <- climCohortData[climValues]
-
-  #remove NA values that exist only because of pixelGroupMap
-  predData <- na.omit(predData)
-
-  pixelGroupsPostSubset <- predData$pixelGroup
-  agePostSubset <- predData$age
-  speciesCodePostSubset <- predData$speciesCode
-
-  modCohortDef <- FALSE
-
-  #necessary for joining if cohortData has added columns
-  if (length(cohortDefinitionCols[!cohortDefinitionCols %in% c('age', 'pixelGroup', 'speciesCode')]) > 0) {
-    modCohortDef <- TRUE
-    addedColumns <-  cohortDefinitionCols[!cohortDefinitionCols %in% c('age', 'pixelGroup', 'speciesCode')]
-    addedColumns <- predData[, ..addedColumns]
-  }
-
-  predData <- predData[, .(logAge, ATA, CMI, CMInormal)]
-
-  #Create the 'reference climate' dataset to normalize the prediction
-  refClim <- predData
-  refClim$CMI <- refClim$CMInormal #replace CMI with the CMI normal for 1950-2010
-  refClim$ATA <- 0 #the anomaly by definition has 0 as nromal
-
-  refClim[, CMInormal := NULL] #or the mortality model will be upset
-  predData[, CMInormal := NULL]
-
-  #make growth prediction as ratio
-  growthPred <- asInteger(predict(gcsModel, predData, level = 0, asList = TRUE, type = "response")/
-                            predict(gcsModel, refClim, level = 0, asList = TRUE, type = "response") * 100)
-  growthPred[growthPred < min(gmcsGrowthLimits)] <- min(gmcsGrowthLimits)
-  growthPred[growthPred > max(gmcsGrowthLimits)] <- max(gmcsGrowthLimits)
-
-  #make mortality prediction
-  mortPred <- asInteger(predict(object = mcsModel, parameter ='mu',
-                                newdata = predData, level = 0, asList = TRUE, type = "response")/
-                          predict(object = mcsModel, parameter = 'mu', newdata = refClim,
-                                  level = 0, asList = TRUE, type = "response") * 100)
-  mortPred[mortPred < min(gmcsMortLimits)] <- min(gmcsMortLimits)
-  mortPred[mortPred > max(gmcsMortLimits)] <- max(gmcsMortLimits)
-
-
-  if (anyNA(c(mortPred, growthPred))) {
-    mortPred[is.na(mortPred)] <- max(gmcsMortLimits)
-    growthPred[is.na(growthPred)] <- max(gmcsGrowthLimits)
-    warning("NA in climate prediction. Likely integer overflow - setting to gmcsLimits")
-  }
-
-  #predict requires exact asme columns in data.frame at the moment, hence this clumsy rebuilding
-  climateEffect <- data.table("pixelGroup" = pixelGroupsPostSubset,
-                              'speciesCode' = speciesCodePostSubset,
-                              "age" = agePostSubset,
-                              "growthPred" = growthPred,
-                              "mortPred" = mortPred)
-  if (modCohortDef) {
-    climateEffect <- cbind(climateEffect, addedColumns)
-  }
-
-  #restrict predictions to those above min stand age
-  climateEffect[age < gmcsMinAge, growthPred := as.integer(100 + ((growthPred - 100) * (age/gmcsMinAge)))]
-  climateEffect[age < gmcsMinAge, mortPred := as.integer(100 + ((mortPred - 100) * (age/gmcsMinAge)))]
-  temp <- cohortData[, ..cohortDefinitionCols]
-  climateEffect <- climateEffect[temp, on = cohortDefinitionCols]
-  rm(temp)
-  #this is to fix any pixelGroups that were dropped by the na.omit of climData due to NA climate values
-  #which should be quite rare but persist with postProcess problems
-  climateEffect[is.na(growthPred), c('growthPred', 'mortPred') := .(100, 100)]
-
-  #Because the params are numeric (e.g 66.667, the comparison forces the int to numeric)
-  climateEffect[, c('growthPred', 'mortPred') := .(asInteger(growthPred), asInteger(mortPred))]
-
-  return(climateEffect)
-}
-
-
-#'  own
-#'  for predicting from gamlss with no random effect
-#' @param fixed the fixed terms
-#' @param random the random terms
-#' @param correlation this is the correlation structure?
-#' @param method TODO: Description needed
-#' @param level the marginal or conditional predictor
-#' @param ... additional arguments passed to lmeCcontrol
-#' @importFrom nlme lmeControl
-#' @importFrom utils tail
-#' @importFrom stats as.formula fitted formula model.frame predict
-#' @importFrom reproducible .grepSysCalls
-
-#' @rdname own
-#' @export
-own <-function(fixed=~1, random = NULL, correlation = NULL, method = "ML",
-               level = NULL, ...)
-{
-  #------------------------------------------
-  # function starts here
-  #------------------------------------------
-  scall <- deparse(sys.call(), width.cutoff = 500L) #
-  if (!is(fixed, "formula")) stop("fixed argument in lme() needs a formula starting with ~")
-  #if (!is(random, "formula")) stop("formula argument in lme() needs a formula starting with ~")
-  # we have to do somehing with corelation
-  # if (!is.null(correlation)) {
-  #   cor.for <- attr(correlation, "formula")
-  #   if (!is.null(cor.for))
-  #     cor.vars <- all.vars(cor.for)
-  # }
-  # else cor.vars <- NULL
-  # get where "gamlss" is in system call
-  # it can be in gamlss() or predict.gamlss()
-
-  # use `tail` because there may be more than one gamlss, e.g., with system.call(gamlss).
-  #  take the last one ... thus tail(..., 1)
-  position <- tail(reproducible::.grepSysCalls(sys.calls(), "gamlss"), 1)
-  # for (i in length(rexpr):1)
-  # {
-  #   position <- i # get the position
-  #   if (rexpr[i]==TRUE) break
-  # }
-  #
-  gamlss.env <- sys.frame(position) #gamlss or predict.gamlss
-  ##--- get the lme control values
-  control  <- lmeControl(...)
-  ## get the data
-  if (sys.call(position)[1]=="predict.gamlss()")
-  { # if predict is used
-    Data <- get("data", envir=gamlss.env)
-  }
-  else if (sys.call(position)[1]=="gamlss()")
-  { # if gamlss() is used
-    if (is.null(get("gamlsscall", envir=gamlss.env)$data))
-    { # if no data argument but the formula can be interpreted
-      Data <- model.frame(formula)
-    }
-    else
-    {# data argument in gamlss
-      Data <- get("gamlsscall", envir=gamlss.env)$data
-    }
-  }
-  else  {
-    Data <- get("data", envir=gamlss.env)
-  }
-  Data <- if (any(attributes(eval(substitute(Data)))$class=="groupedData")) eval(substitute(Data))
-  else data.frame(eval(substitute(Data)))
-  #=====
-  len <- dim(Data)[1] # get the lenth of the data
-  ## out
-  xvar <- rep(0,  len) # model.matrix(as.formula(paste(paste("~",ff, sep=""), "-1", sep="")), data=Data) #
-  attr(xvar,"fixed")       <- fixed
-  attr(xvar,"random")      <- random
-  attr(xvar,"method")      <- method
-  attr(xvar,"correlation") <- correlation
-  attr(xvar,"level")       <- level
-  attr(xvar,"control")     <- control
-  attr(xvar, "gamlss.env") <- gamlss.env
-  if (any(attributes(Data)$class=="groupedData")) {
-    attr(xvar, "data") <- Data } else {
-      attr(xvar, "data") <- as.data.frame(Data)
-    }
-  attr(xvar, "call")       <- substitute(gamlss.own(data[[scall]], z, w, ...))
-  attr(xvar, "class")      <- "smooth"
-  xvar
-}
-
-
-
-#' gamlss.own
-#' the definition of the backfitting additive function, Authors: Mikis Stasinopoulos, Marco Enea
-#' @param x description missing
-#' @param y description missing
-#' @param w description missing
-#' @param xeval description missing
-#' @importFrom nlme lme varFixed
-#' @importFrom stats as.formula fitted formula model.frame predict
-#' @rdname gamlss.own
-#' @export
-gamlss.own <- function(x, y, w, xeval = NULL)
-{
-  fixed <- attr(x, "fixed")
-  random <- attr(x, "random")
-  correlation <- attr(x, "correlation")
-  method <- attr(x, "method")
-  level <- attr(x, "level")
-  fix.formula <-
-    as.formula(paste("Y.var", deparse(fixed, width.cutoff = 500L), sep = ""))
-  control <- as.list(attr(x, "control"))
-  #gamlss.env <- as.environment(attr(x, "gamlss.env"))
-  OData <- attr(x, "data")
-  Data <-  if (is.null(xeval))
-    OData #the trick is for prediction
-  else
-    OData[seq(1, length(y)), ]
-  if (any(attributes(Data)$class == "groupedData")) {
-    Data$W.var <- 1 / w
-    Data$Y.var <- y
+  # extract relevant args
+  #assume that climate normals are present in cceArgs as cceArts$historicalClimate$historical_<var>_normal
+  #assume climate variables are denoted by cceArgs$climateVariables
+  if (!is.null(cceArgs$climateYear)) {
+    thisYear <- cceArgs$climateYear
   } else {
-    Y.var <- y
-    W.var <- 1 / w
-    Data <- data.frame(eval(substitute(Data)), Y.var, W.var)
+    thisYear <- time
   }
-  #       Data <- data.frame(eval(substitute(Data)),y,wei=1/w)
-  # fit  <-  lme(All$fixed, data = Data, random=All$random, weights=varFixed(~wei),  method="ML")
-  #
-  #              (fixed, data = sys.frame(sys.parent()), random, correlation = NULL,
-  #           weights = NULL, subset, method = c("REML", "ML"), na.action = na.fail,
-  #           control = list(), contrasts = NULL, keep.data = TRUE)
-  # lme(fixed = fixed, random = random, data = data,
-  #    correlation = correlation, control = control, weights = varFixed(w.formula),
-  #    method = "ML", ...)
-  fit <- lme(fixed = fix.formula,
-             data = Data,
-             random = random,
-             weights = varFixed( ~ W.var),
-             correlation = correlation,
-             control = control,
-             method = method
-  )
-  fv <- fitted(fit)
-  residuals <- y - fv
-  N <- sum(w != 0)
-  df <-  N - (sum(w * (y - fv) ^ 2)) / (fit$sigma ^ 2)
-  if (is.null(xeval)){
-    list(
-      fitted.values = fv,
-      residuals = residuals,
-      nl.df = df - 1,
-      lambda = fit$sigma,
-      # Mikis 10-6-19 df should be df-1 not df
-      coefSmo = fit,
-      var = NA
-    )    # var=fv has to fixed
+  
+  climateVariables <- cceArgs$climateVariablesForGMCS
+  if (!is.null(cceArgs$currentClimateRasters)) {
+    climateRasters <- cceArgs$currentClimateRasters[[climateVariables]]
+  } else if (!is.null(cceArgs$projectedClimateRasters)) {
+    climateRasters <- cceArgs$projectedClimateRasters
+    climateRasters <- lapply(climateRasters[climateVariables], "[[", paste0("year", thisYear)) |>
+      rast()
+  } else {
+    stop("no method of obtaining climate data for LandR.CS")
   }
-  else {
-    # ll<-dim(OData)[1]
-    # assign("fix.formula",fix.formula,envir=globalenv())
-    # on.exit(rm(fix.formula,envir=globalenv()))
-    # pred <- eval(expression(predict(fit,newdata = OData[seq(length(y)+1,ll),])),envir=environment() )
-    fit$call$fixed <- substitute(fix.formula)
-    ll <- dim(OData)[1]
-    pred <-
-      if (is.null(level))
-        predict(fit, newdata = OData[seq(length(y) + 1, ll), ])
-    else
-      predict(fit, newdata = OData[seq(length(y) + 1, ll), ], level = level)
+  # Get the variables which require anomalies
+  # Note if anomaly variables become available directly, they should be 'unnamed'
+  # to skip the steps that manually calculate them
+  anomalyVariables <- setdiff(names(climateVariables), "")
+  if (length(anomalyVariables)) {
+    anomalyVariables <- setdiff(names(climateVariables), "")
+    varsWithAnomalies <- climateVariables[anomalyVariables]
+    normalNames <- paste0(varsWithAnomalies, "_normal")
+    climateNormal <- cceArgs$historicalClimateRasters[normalNames] |>
+      rast()
+    anomalyRasters <- terra::subset(climateRasters, varsWithAnomalies)
+    names(climateNormal) <- names(anomalyRasters)
+    #TODO: think of ways this might get screwed up - prevent them 
+    anomalyOut <- lapply(varsWithAnomalies, 
+                         function(anomaly, normals = climateNormal, current = anomalyRasters) {
+                           anomalyRas <- current[[anomaly]] - normals[[anomaly]]
+                         }) |>
+      rast()
+    names(anomalyOut) <- anomalyVariables
+    allClimateRas <- c(climateRasters, anomalyOut)
+  } else { 
+    allClimateRas <- climateRasters 
   }
+  
+  climateCovariates <- as.data.table(allClimateRas, cells = TRUE)
+  pixelGroupDT <- data.table(pixelIndex = 1:ncell(pixelGroupMap), pixelGroup = as.vector(pixelGroupMap))
+  climateCovariates <- climateCovariates[pixelGroupDT, on = c("cell" = "pixelIndex")]
+  #calculate the mean climate variable for each pixelGroup, as some groups overlap multiple pixels
+  climateCovariates <- climateCovariates[!is.na(pixelGroup), lapply(.SD, mean), 
+                                         .SDcols = names(allClimateRas), .(pixelGroup)]
+  
+  historicalClimate <- as.data.table(climateNormal, cells = TRUE)
+  historicalClimate <- historicalClimate[pixelGroupDT, on = c("cell" = "pixelIndex")]
+  historicalClimate <- historicalClimate[!is.na(pixelGroup), lapply(.SD, mean), 
+                                         .SDcol = climateVariables, .(pixelGroup)]
+  #assume that anomalies are 0 (ie they are the normal)
+  if (length(anomalyVariables)){
+    set(historicalClimate, NULL, anomalyVariables, 0)
+  }
+  #TODO: 
+  #dataprep should use a function to at least confirm colnames and units correct
+  # standBiomass + biomass in g/m2, logAge = logged standAge (ie identical by cohort in PG),
+  #subset cd for necessary columns
+  cohortData <- cohortData[age >= gmcsMinAge, .(speciesCode, B, mortality, age, pixelGroup)]
+  
+  #calculate biomass-weighted age, then log it
+  cohortData[, standBiomass := sum(B), .(pixelGroup)]
+  cohortData[, weightedAge := sum(B * age)/standBiomass, .(pixelGroup)]
+  cohortData[, logAge := log(weightedAge)]
+  
+  #collapse cohorts by species
+  cd <- cohortData[, .(biomass = sum(B)), .(pixelGroup, speciesCode, logAge, standBiomass)]
+  
+  #Make predictions
+  predictedGrowth <- lapply(list(climateCovariates, historicalClimate), 
+                            getModelPred, cohortData = cd, 
+                            gmcsModel = cceArgs$gcsModel, 
+                            stat = "growth")
+  #take the 'historical' prediction for calculation of modifier
+  subsetDT <- predictedGrowth[[2]][, .(pixelGroup, speciesCode, growth)]
+  setnames(subsetDT, "growth", "pred_historicalGrowth")
+  setnames(predictedGrowth[[1]], old = "growth", new = "pred_currentGrowth")
+  #take means before join to avoid having to track fold
+  
+  predictedGrowth <- predictedGrowth[[1]][subsetDT, on = c("pixelGroup", "speciesCode")]
+  predictedGrowth[, growthPred := asInteger(pred_currentGrowth/pred_historicalGrowth * 100)]
+  
+  #back to cohorts separated by age
+  cohortData <- cohortData[predictedGrowth, on = c("pixelGroup", "speciesCode")]
+  predictedMortality <- lapply(list(climateCovariates, historicalClimate), 
+                               getModelPred, cohortData = cd, 
+                               gmcsModel = cceArgs$mcsModel, 
+                               stat = "mortality")
+  #take the 'historical' prediction for calculation of modifier
+  subsetDT <- predictedMortality[[2]][, .(pixelGroup, speciesCode, mortality)]
+  
+  #note cohort data has existing mortality column
+  setnames(subsetDT, "mortality", "pred_historicalMortality")
+  setnames(predictedMortality[[1]], old = "mortality", new = "pred_currentMortality")
+  #take means before join to avoid having to track fold
+  
+  predictedMortality <- predictedMortality[[1]][subsetDT, on = c("pixelGroup", "speciesCode")]
+  #mortality modifier is in g/m2
+  #apply modifiers here 
+  predictedMortality[pred_currentMortality < 0, pred_currentMortality := 0]
+  predictedMortality[pred_historicalMortality < 0, pred_historicalMortality := 0]
+  
+  predictedMortality[, mortPred := asInteger(pred_currentMortality - pred_historicalMortality)]
+  #need pooled biomass
+  #this is the species-level biomass - must be called this for predict
+  predictedMortality <- predictedMortality[cd[, .(pixelGroup, speciesCode, biomass)],
+                                           on = c("pixelGroup", "speciesCode")]
+  setnames(predictedMortality, old = "biomass", new = "speciesB")
+
+  cohortData <- cohortData[predictedMortality, on = c("pixelGroup", "speciesCode")]
+  
+  cohortData[, growthPred := pmax(min(gmcsGrowthLimits), pmin(growthPred, max(gmcsGrowthLimits)))]
+  #distribute mortality according to B 
+  # B here is summed by species - so rename
+
+  cohortData <- cohortData[, .(pixelGroup, speciesCode, age,  B, speciesB, standBiomass, growthPred, mortPred)]
+
+  tooYoung <- originalCD[age < gmcsMinAge,]
+  
+  # speciesB does not include cohorts that are below the minimum age
+  # this scales the prediction (in g/m2) by cohort biomass 
+  # (for each species, for when 2 or more cohorts are present)
+  cohortData[, mortPred := c(mortPred * B/speciesB)]
+  # cohortData[, c("speciesB", "standBiomass") := NULL]
+  
+  if (is.null(cceArgs$climateYear)) {
+    cohortData[, climateYear := time]
+  } else {
+    cohortData[, climateYear := cceArgs$climateYear]
+  }
+  #due to creation of summary module, decided to add these columns back in
+  cohortData <- data.table::merge.data.table(cohortData, 
+                    predictedGrowth[, .(pred_currentGrowth, pred_historicalGrowth, pixelGroup, speciesCode)])
+  cohortData <- data.table::merge.data.table(cohortData, 
+                                             predictedMortality[, .(pred_currentMortality, pred_historicalMortality, 
+                                                                    pixelGroup, speciesCode)])
+  cohortData <- climateCovariates[cohortData, on = c("pixelGroup")]
+  #now add back in those that are too young
+  #TODO first subset the columns of tooYoung so it doesnt' add bPM, bAP, mAge, etc. 
+  tooYoung <- tooYoung[, intersect(names(tooYoung), names(cohortData)), with = FALSE]
+  cohortData <- rbind(cohortData, tooYoung, fill = TRUE)
+  cohortData[is.na(growthPred), c("growthPred", "mortPred") := .(100, 0)]
+
+  #join back in LandR model growth for diagnostic purposes
+  
+  sub <- originalCD[, .(maxANPP, speciesCode, age, pixelGroup)]
+  cohortData <- sub[cohortData, on = c("speciesCode", "age", "pixelGroup")]
+  setcolorder(cohortData, c("pixelGroup", "age", "B"))
+  
+  return(cohortData = cohortData)
+}
+
+#' getModelPred
+#'
+#' Join cohortData with either the growth or mortality xgboost models
+#' This is a utility function to avoid repetition as 2 predictions are needed
+#' for each model (under the current climate, and historical) to achieve the 
+#' climate modifier
+
+#' @param cohortData The LandR cohortData object
+#' @param climateCovariates data.table of mean climate covariates by pixelGroup 
+#' @param stat character vector of either "growth" or "mortality"
+#' this is used to name the pred column and exponentiate predicted growth if applicable
+#' @importFrom data.table setkey data.table
+#' @importFrom LandR asInteger
+#' @importFrom terra ncell
+#' @importFrom data.table as.data.table copy melt.data.table rbindlist setnames
+#' @importFrom stats model.matrix
+#' @keywords internal
+#' @rdname getModelPred
+getModelPred <- function(cohortData, climateCovariates, gmcsModel, stat = "growth") {
+  
+  stopifnot(stat %in% c("growth", "mortality"))
+  
+  predData <- cohortData[climateCovariates, on = "pixelGroup"]
+  setnames(predData, "speciesCode", "spp") #to match fitting
+  #take the character vector and make into dummy variables like so
+  #give each species "spp" at the start to match the fitted data (ideally this is not hardcoded)
+  predData <- model.matrix(~ . + 0, data = predData)
+  predData <- as.data.table(predData)
+  
+  #if tree species are absent, they must be added for the predict
+  fittedCols <- names(gmcsModel$Fold1$valData)
+  missing <- setdiff(fittedCols, c(names(predData), "obs", "pred", "resid"))
+  if (length(missing)){
+    set(predData, j = missing, value =  0)
+  }
+  
+  gmPreds <- lapply(gmcsModel, function(Fold, data = predData){
+    out <- copy(data)
+    out[, predCol := predict(object = Fold$mod, newdata = data)]
+    return(out)
+  }) |>
+    rbindlist()
+  #now summarize 
+  #probably you will have to do this 4 times so turn it into a function
+  out <- melt.data.table(gmPreds, id.vars = c("pixelGroup", "predCol"), 
+                         measure.vars = grep("spp", colnames(gmPreds), value = TRUE),
+                         variable.name = "speciesCode", value.name = "presence")
+  out <- out[presence == 1,] #keep only presences
+  out[, speciesCode := gsub(pattern = "spp", replacement = "", speciesCode)]
+  out[, speciesCode := factor(speciesCode, levels = levels(cohortData$speciesCode))]
+  
+  #take the mean of the folds
+  out <- out[, .(predCol = mean(predCol)), .(speciesCode, pixelGroup)]
+  
+  if (stat == "growth") {
+    out[, predCol := exp(predCol)]
+  }
+  #rename column to either mortality or growth
+  setnames(out, "predCol", stat)
+  
+  return(out)
 }
