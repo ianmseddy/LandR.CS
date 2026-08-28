@@ -1,7 +1,7 @@
 utils::globalVariables(c(
-  ".SD", ".", "age", "aNPPAct", "B", "ClimateYear", "growth", "growthPred", 
+  ".SD", ".", "age", "aNPPAct", "B", "biomass", "ClimateYear", "climateYear", "growth", "growthPred", 
   "pred_currentGrowth", "pred_currentMortality", "pred_historicalGrowth", "pred_historicalMortality", 
-  "logAge",  "mortality", "mortPred", "obs", "pixelGroup", "pred", "predCol", "presence", 
+  "logAge", "maxANPP", "mortality", "mortPred", "obs", "pixelGroup", "pred", "predCol", "presence", 
   "spp", "speciesB", "speciesCode", "resid", "standBiomass", "weightedAge", "year"
 ))
 # 

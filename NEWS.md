@@ -1,3 +1,15 @@
+version 2.1.0.9000
+
+- added a `testthat` suite covering `calculateClimateEffect()` and `getModelPred()`
+  (~97% coverage). The growth/mortality models are stubbed with `lm` fits, so the
+  tests need neither `xgboost` nor real climate data;
+- fixed: `data.table::setcolorder()` was called but never imported, so
+  `calculateClimateEffect()` failed with `could not find function "setcolorder"`
+  unless the caller happened to have `data.table` attached;
+- added `biomass`, `climateYear` and `maxANPP` to `utils::globalVariables()`,
+  clearing the last `R CMD check` NOTE (package now checks clean);
+
+
 version 2.1.0
 
 - CI: the `R-CMD-check`, `test-coverage` and `pkgdown` workflows are now thin callers of the

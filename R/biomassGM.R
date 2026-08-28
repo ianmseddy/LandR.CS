@@ -9,7 +9,7 @@
 #'                   younger ages are weighted toward a null effect with decreasing age
 #' @param time the time of simulation - only used for writing outputs if applicable
 #' @param cohortDefinitionCols cohortData columns that determine individual cohorts
-#' @importFrom data.table `:=` as.data.table data.table fwrite rbindlist set setkey setnames 
+#' @importFrom data.table `:=` as.data.table data.table fwrite rbindlist set setcolorder setkey setnames
 #' @importFrom LandR asInteger
 #' @importFrom terra ncell rast
 #' @importFrom stats na.omit predict median
